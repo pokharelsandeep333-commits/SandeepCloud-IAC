@@ -1,0 +1,2 @@
+# Copy to backend.hcl (gitignored). The name is the state_bucket output of bootstrap/.
+bucket = "sandeepcloud-tfstate-<ACCOUNT_ID>"
