@@ -17,6 +17,8 @@ terraform.rc
 *.tfvars
 *.tfvars.json
 !*.tfvars.example
+# Partial backend config holds the state bucket name, which includes the account ID
+backend.hcl
 
 # Secrets never go in this repo
 .env
