@@ -24,7 +24,7 @@
 | 📦 **Managed** | 58 live AWS resources: 2 EC2 servers, Elastic IPs, security groups, CloudTrail and its bucket, EBS snapshot policy, budget, alarms |
 | 🔁 **Adopted, not rebuilt** | Every resource was brought in with `import` blocks until `terraform plan` said **`No changes.`**, then refactored into a module with `moved` blocks, still `No changes.` |
 | 🧩 **Modular** | One `web-host` module, called once per server, each with its own on/off switch |
-| 🛡️ **Scanned** | `fmt` · `validate` · TFLint · Checkov · Trivy · gitleaks on every PR, with findings in GitHub code scanning |
+| 🛡️ **Scanned** | `fmt` · `validate` · TFLint · Checkov · Trivy · gitleaks on every PR, with findings in GitHub code scanning. **Zero open findings**: every one was fixed or accepted in code with a reason |
 | 🔐 **No secrets in code** | No passwords, keys or tokens in `.tf`, tfvars, outputs or state. Personal values stay in a gitignored `terraform.tfvars` |
 
 ## 🗺️ Architecture
@@ -79,7 +79,7 @@ flowchart LR
 | Job | What it runs | Fails the build? |
 |---|---|---|
 | 🎨 **Format · Validate · Lint** | `terraform fmt -check`, `init -backend=false` + `validate` for each root module, TFLint with the AWS ruleset | ✅ Yes |
-| 🛡️ **Security scan** | Checkov (Terraform + this workflow) and Trivy, uploaded to code scanning | 🟡 Report-only until Phase 3 |
+| 🛡️ **Security scan** | Checkov (Terraform + this workflow) and Trivy, uploaded to code scanning, then a 🚦 gate | ✅ Yes, on any finding not skipped in code with a reason |
 | 🔐 **Secret scan** | gitleaks across the **whole git history** | ✅ Yes |
 
 **How the pipeline is locked down**
@@ -105,16 +105,22 @@ Each run writes a summary table per job to the run page.
 
 ## ⚠️ Accepted risks
 
-Checks skipped **in code**, each with a written reason. Skipped checks are kept out of code scanning, so this table is where they're recorded.
+Phase 3 took the first scan's **25 findings (Checkov 16, Trivy 9)** to zero: **7 fixed** and **18 accepted**. The rule was to fix what's free and accept what costs money or adds risk, with a reason. Each accepted risk is a `#checkov:skip=ID:reason` or `#trivy:ignore:ID` line next to the resource. Skipped checks are kept out of code scanning, so this table is where they're recorded.
+
+**Fixed:** versioning on the CloudTrail bucket (deleted logs recoverable for 30 days), cleanup of unfinished uploads, and descriptions on every security group rule.
 
 | Check | Resource | Why it's accepted |
 |---|---|---|
-| `CKV_AWS_18` / `AVD-AWS-0089` access logging | state bucket | Needs a second bucket for a one-person state bucket. CloudTrail already records bucket-level changes |
-| `CKV_AWS_144` cross-region replication | state bucket | Doubles the cost. State is rebuilt from code in a new account |
-| `CKV_AWS_145` customer-managed KMS key | state bucket | SSE-S3 instead. A key costs $1/month and adds a decrypt dependency |
-| `CKV2_AWS_62` event notifications | state bucket | Nothing consumes them |
-
-**Open findings** (Checkov 16, Trivy 9) describe the live account exactly as it was imported. They're listed in [`envs/prod/README.md`](envs/prod/README.md) and get triaged in Phase 3: fixed if free, otherwise skipped in code and added here with a reason. One is already decided: the Ad-Blocker's public port 80 (`CKV_AWS_260`) stays, because public DoH is the product. After triage, the scanners start failing the build.
+| `CKV_AWS_35` / `AVD-AWS-0015`, `CKV_AWS_145` / `AVD-AWS-0132` customer-managed KMS key | CloudTrail, trail bucket, state bucket | SSE-S3 already encrypts at rest. A key costs $1/month, and the Wazuh reader would need `kms:Decrypt` in a stack managed outside this repo |
+| `CKV_AWS_18` / `AVD-AWS-0089` access logging | trail bucket, state bucket | Needs a second bucket. CloudTrail already records bucket-level changes |
+| `CKV_AWS_144` cross-region replication | trail bucket, state bucket | Doubles storage. Wazuh keeps an off-account copy of the trail, and state is rebuilt from code in a new account |
+| `CKV2_AWS_62` event notifications | trail bucket, state bucket | Nothing consumes them. Wazuh polls the bucket |
+| `CKV2_AWS_10` / `AVD-AWS-0162` CloudWatch Logs | CloudTrail | Ingestion is billed. Wazuh is where the logs get analysed |
+| `CKV_AWS_252` SNS topic | CloudTrail | Nothing consumes per-file notifications |
+| `CKV_AWS_126` detailed monitoring | both servers | About $2.10/instance/month. The status-check alarms already get free 1-minute metrics |
+| `CKV2_AWS_41` no IAM role | both servers | Neither server calls AWS APIs. No role means no AWS credentials on the box to steal through IMDS |
+| `CKV_AWS_260` port 80 open to all | Ad-Blocker | The HTTP-to-HTTPS redirect and Let's Encrypt HTTP-01 renewal |
+| `AVD-AWS-0104` unrestricted egress | both servers | Updates, Docker pulls, Tailscale, Let's Encrypt and upstream DNS all need it. Port-restricted egress gets tried in the fire drill, where a wrong rule can't break a live server |
 
 ## 📁 Repository layout
 
@@ -149,9 +155,9 @@ Each server can be built alone: set `enable_sandeepcloud` or `enable_adblocker` 
 | 0 | 🧰 Inventory, tooling, repo, state bucket | ✅ Done |
 | 1 | 📥 Import all 58 resources → **`No changes.`**, then the module refactor | ✅ Done |
 | 2 | 🔄 CI: fmt, validate, TFLint, Checkov, Trivy, gitleaks → code scanning | ✅ Done |
-| 3 | 🩹 Triage findings: fix the free ones, skip the rest with reasons, then fail the build on new ones | 🚧 Next |
+| 3 | 🩹 Triage findings: 25 → 0 (7 fixed, 18 accepted with reasons); the build now fails on any new one | ✅ Done |
 | 4 | 👁️ GuardDuty + AWS Config + alerts | ⏸️ On hold |
-| 5 | 🖥️ Server layer: cloud-init, compose files, encrypted off-site backups, restore runbook | 📋 Planned |
+| 5 | 🖥️ Server layer: cloud-init, compose files, encrypted off-site backups, restore runbook | 🚧 Next |
 | 6 | 🔥 Fire drill: rebuild from zero, restore, time it, tear it down | 📋 Planned |
 
 ---

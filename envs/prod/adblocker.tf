@@ -24,8 +24,8 @@ module "adblocker" {
   security_group_name        = "launch-wizard-3"
   security_group_description = "launch-wizard-3 created 2026-07-29T17:40:24.932Z"
   ingress_rules = {
-    http  = { port = 80, cidr = "0.0.0.0/0" }
-    https = { port = 443, cidr = "0.0.0.0/0" }
+    http  = { port = 80, cidr = "0.0.0.0/0", description = "HTTP to HTTPS redirect and Lets Encrypt HTTP-01" }
+    https = { port = 443, cidr = "0.0.0.0/0", description = "Public DNS-over-HTTPS" }
   }
 
   status_alarms = true

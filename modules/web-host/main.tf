@@ -4,7 +4,10 @@
 
 data "aws_region" "current" {}
 
+# These skips cover every server this module builds (SandeepCloud and the Ad-Blocker today).
 resource "aws_instance" "this" {
+  #checkov:skip=CKV_AWS_126:Detailed monitoring is about $2.10/instance/month; the status-check alarms already get free 1-minute metrics
+  #checkov:skip=CKV2_AWS_41:Neither server calls AWS APIs; no instance role means no AWS credentials on the box to steal via IMDS. Revisit if they ever read SSM parameters
   ami                     = var.ami
   instance_type           = var.instance_type
   subnet_id               = var.subnet_id
@@ -78,6 +81,7 @@ resource "aws_security_group" "this" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "this" {
+  #checkov:skip=CKV_AWS_260:Ad-Blocker only (SandeepCloud allows Cloudflare ranges only): port 80 is open to all for the HTTP-to-HTTPS redirect and Let's Encrypt HTTP-01 renewal
   for_each = var.ingress_rules
 
   security_group_id = aws_security_group.this.id
@@ -88,8 +92,13 @@ resource "aws_vpc_security_group_ingress_rule" "this" {
   cidr_ipv4         = each.value.cidr
 }
 
+# Both servers need outbound traffic: OS updates, Docker pulls, Tailscale, Let's
+# Encrypt and (Ad-Blocker) upstream DNS. Port-restricted egress gets tried in the
+# fire drill, where a wrong rule can't break a live server.
+#trivy:ignore:AVD-AWS-0104 Open egress kept for now, see the comment above
 resource "aws_vpc_security_group_egress_rule" "all" {
   security_group_id = aws_security_group.this.id
+  description       = "All outbound: updates, Docker pulls, Tailscale, Lets Encrypt, upstream DNS"
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
 }

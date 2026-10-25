@@ -7,7 +7,9 @@ One public web server on EC2: the instance, an Elastic IP and its association, t
 - IMDSv2 required, encrypted gp3 root volume (3000 IOPS, 125 MB/s), termination protection on.
 - `prevent_destroy` and `ignore_changes = [ami, user_data]` on the instance. Lifecycle settings can't come from variables, so every server this module builds is protected. Destroying one takes a code change.
 - No ingress on port 22. SSH goes over Tailscale, and the `ingress_rules` validation refuses port 22.
-- Egress is open to everywhere (Trivy AVD-AWS-0104, triaged in Phase 3).
+- Egress is open to everywhere: updates, Docker pulls, Tailscale, Let's Encrypt and upstream DNS need it. Accepted for now (`AVD-AWS-0104`); port-restricted egress gets tried in the fire drill.
+- Rule descriptions are validated against the characters AWS accepts (no apostrophes), so a bad one fails at plan time instead of mid-apply.
+- **Scanner skips here cover every server the module builds**: no detailed monitoring (`CKV_AWS_126`), no instance role (`CKV2_AWS_41`), and port 80 open to all (`CKV_AWS_260`, written for the Ad-Blocker). Reasons are next to each resource and in the root README.
 
 ## Inputs
 
