@@ -1,0 +1,19 @@
+# One restic backup run to one target: restic-backup@r2.service, restic-backup@homelab.service.
+# Started by restic-backup-r2.timer / restic-backup-homelab.timer, or by hand:
+#   sudo systemctl start restic-backup@r2.service && journalctl -u restic-backup@r2 -e
+[Unit]
+Description=restic backup to %i
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/restic-backup %i
+Nice=10
+IOSchedulingClass=idle
+# Reads the whole disk, writes only its cache (/var/cache/restic, created by systemd).
+ProtectSystem=strict
+CacheDirectory=restic
+CacheDirectoryMode=0700
+PrivateTmp=yes
+NoNewPrivileges=yes

@@ -1,0 +1,12 @@
+#!/bin/bash
+# Stop the backup if last night's MariaDB dump is missing or stale, rather than
+# backing up an old one without noticing. The dump is made by
+# /usr/local/sbin/nextcloud-db-dump.sh at 05:30 UTC (server/sandeepcloud/).
+set -euo pipefail
+
+dir=/var/backups/nextcloud
+newest=$(find "$dir" -maxdepth 1 -name 'nextcloud-*.sql.gz' -mmin -1560 -print -quit)
+if [ -z "$newest" ]; then
+  echo "no DB dump newer than 26 hours in $dir" >&2
+  exit 1
+fi

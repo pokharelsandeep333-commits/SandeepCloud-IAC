@@ -1,0 +1,25 @@
+# Left out of the SandeepCloud backup (restic --exclude-file): rebuilt, re-downloaded or regenerated.
+
+# Nextcloud logs (190 MB) and thumbnail previews (regenerated on demand)
+/var/lib/docker/volumes/sandeepcloud_sandeepcloud_data/_data/data/nextcloud.log*
+/var/lib/docker/volumes/sandeepcloud_sandeepcloud_data/_data/data/appdata_*/preview
+
+# The wiki is a git clone, pulled every minute by sync-vault.sh; re-clone it instead
+/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/LLM-Wiki
+/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/sync-vault.log*
+
+# Hermes runtimes, package caches and logs (about 1.3 GB)
+/home/ubuntu/.hermes/node
+/home/ubuntu/.hermes/bin
+/home/ubuntu/.hermes/.npm
+/home/ubuntu/.hermes/.cache
+/home/ubuntu/.hermes/.cua-driver
+/home/ubuntu/.hermes/home/.npm
+/home/ubuntu/.hermes/home/.cache
+/home/ubuntu/.hermes/cache
+/home/ubuntu/.hermes/image_cache
+/home/ubuntu/.hermes/audio_cache
+/home/ubuntu/.hermes/lazy-packages
+/home/ubuntu/.hermes/logs
+/home/ubuntu/.hermes/*_cache.json
+/home/ubuntu/.hermes/*_cache.yaml
