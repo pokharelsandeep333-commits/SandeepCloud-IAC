@@ -8,6 +8,12 @@ The root module for the current AWS account: the account baseline (CloudTrail an
 
 Both instances have `prevent_destroy` and `ignore_changes = [ami, user_data]`. The trail bucket has `prevent_destroy`.
 
+## Module refactor
+
+Each server is a call to [`modules/web-host`](../../modules/web-host) in `sandeepcloud.tf` and `adblocker.tf`. Each call has its own switch, `enable_sandeepcloud` / `enable_adblocker` (both default `true`), so either server can be built alone. Turning off a server that's already in state fails the plan, because the module's instance has `prevent_destroy`. That's intended.
+
+The `moved` blocks next to each module call carry the 46 server resources from their old flat addresses into the modules. The server import blocks were removed: they did their job, and an import block can't target a module that might be switched off. The first plan after the refactor should list 46 moves and say **`Plan: 0 to add, 0 to change, 0 to destroy.`** After the apply records the moves, the next plan says `No changes.`
+
 ## Run (Sandeep, PowerShell only)
 
 ```powershell
@@ -38,3 +44,5 @@ These describe the account as it is today. Fixing them changes live resources, s
 | Rules without descriptions (CKV_AWS_23, AVD-AWS-0124) | Ad-Blocker rules, both egress rules |
 | Port 80 open to the internet (CKV_AWS_260) | Ad-Blocker. Public DoH is the product, so this one is accepted |
 | Unrestricted egress (AVD-AWS-0104) | both security groups |
+
+Since the module refactor, Checkov and Trivy no longer report the missing descriptions on the Ad-Blocker's two ingress rules. They can't follow a `null` description through the module's `ingress_rules` variable. **The rules still have no description.** The finding stays on this list until Phase 3 adds one.

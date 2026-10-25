@@ -14,6 +14,18 @@ variable "region" {
   default     = "us-east-1"
 }
 
+variable "enable_sandeepcloud" {
+  description = "Build the SandeepCloud server. Setting this false while it's in state fails the plan (prevent_destroy)."
+  type        = bool
+  default     = true
+}
+
+variable "enable_adblocker" {
+  description = "Build the Ad-Blocker server. Setting this false while it's in state fails the plan (prevent_destroy)."
+  type        = bool
+  default     = true
+}
+
 variable "alert_email" {
   description = "Where budget alerts go. Set in terraform.tfvars (gitignored)."
   type        = string
