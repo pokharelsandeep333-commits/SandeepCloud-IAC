@@ -1,0 +1,164 @@
+# Static checks for the Terraform in this repo. No AWS credentials, no plan,
+# never apply: Sandeep runs plan/apply locally.
+#
+# Every action is pinned to a full commit SHA (version in the comment), and
+# every action release was at least a week old when pinned. The tool versions
+# match the ones run locally, and the Trivy and gitleaks binaries are checked
+# against SHA-256 hashes written here, not ones fetched at run time.
+
+name: iac
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+# A newer run on the same branch makes the older one moot: every run scans the
+# whole tree and gitleaks scans the whole history. (A literal true here, not an
+# expression: Checkov's workflow schema rejects one and then skips the file.)
+concurrency:
+  group: iac-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "1"
+  TERRAFORM_VERSION: "1.16.6"
+  TFLINT_VERSION: "v0.65.0"
+  CHECKOV_VERSION: "3.3.30"
+  TRIVY_VERSION: "0.76.1"
+  TRIVY_SHA256: "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0"
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: fmt, validate, TFLint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+      # Each root module, without a backend: CI has no AWS access and never reads state.
+      - name: terraform validate
+        run: |
+          for dir in bootstrap envs/prod; do
+            echo "::group::$dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+            echo "::endgroup::"
+          done
+
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: ${{ env.TFLINT_VERSION }}
+
+      # The token only raises the API rate limit for the plugin download.
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
+          tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
+
+  scan:
+    name: Checkov and Trivy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Checkov
+        run: python -m pip install --disable-pip-version-check "checkov==$CHECKOV_VERSION"
+
+      # Phase 2 reports findings without failing the build: they describe the
+      # account as it is today and are triaged in Phase 3, which removes --soft-fail.
+      - name: checkov
+        run: |
+          checkov --directory . --framework terraform github_actions \
+            --download-external-modules false --soft-fail \
+            --output cli --output sarif --output-file-path console,checkov.sarif
+
+      - name: Install Trivy
+        run: |
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$tarball" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$tarball"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$tarball" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" trivy
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      # Same rule as Checkov: report now, fail from Phase 3 (--exit-code 1).
+      - name: trivy
+        run: |
+          trivy config --exit-code 0 .
+          trivy config --quiet --exit-code 0 --format sarif --output trivy.sarif .
+
+      # A fork's token can't write security events, so only upload for this repo's own branches.
+      - name: Upload Checkov SARIF
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: checkov.sarif
+          category: checkov
+
+      - name: Upload Trivy SARIF
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      # Full history: a secret that was ever committed counts, even if a later commit removed it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$tarball"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$tarball" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" gitleaks
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      # Fails the job on any finding; --redact keeps the secret itself out of the log.
+      - name: gitleaks
+        run: gitleaks git --redact --no-banner --verbose .
