@@ -13,6 +13,10 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | `sandeepcloud/uptime-kuma/docker-compose.yml` | `/home/ubuntu/uptime-kuma/` | Copied as-is |
 | `sandeepcloud/hermes/docker-compose.yml` | none (started with `docker run`) | Rebuilt from `docker inspect` |
 | `sandeepcloud/logrotate-sandeepcloud-nginx` | `/etc/logrotate.d/sandeepcloud-nginx` | Copied as-is |
+| `sandeepcloud/nextcloud-db-dump.sh` | `/usr/local/sbin/` | Copied as-is: nightly MariaDB dump, 7 days kept |
+| `sandeepcloud/cron.d-nextcloud-db-dump` | `/etc/cron.d/nextcloud-db-dump` | Copied as-is: runs the dump at 05:30 UTC |
+| `sandeepcloud/crontab-ubuntu` | `ubuntu`'s crontab | Copied as-is: Nextcloud `cron.php` every 5 minutes, wiki `git pull` every minute |
+| `backup/` | `/etc/restic`, `/usr/local/sbin`, systemd | Written new: restic backups to R2 and the homelab. See [`backup/README.md`](backup/README.md) |
 | `adblocker/adguardhome/docker-compose.yml` | none (started with `docker run`) | Rebuilt from `docker inspect` |
 | `adblocker/nginx/nginx.conf` | `/etc/nginx/nginx.conf` | Copied as-is (Ubuntu default + `server_tokens off`) |
 | `adblocker/nginx/conf.d/00-adguard-common.conf` | `/etc/nginx/conf.d/` | Copied as-is |
@@ -21,7 +25,9 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 
 "Copied as-is" files were checked with `sha256sum` against the live copy. They still hold the live absolute paths (`/home/ubuntu/...`); tidying those is a later, separate change.
 
-## 🔒 Kept out of this repo (goes in the encrypted backup)
+## 🔒 Kept out of this repo (in the encrypted backup instead)
+
+[`backup/`](backup/) backs these up; its include lists are the exact version of this table.
 
 | SandeepCloud | Ad-Blocker |
 |---|---|
@@ -38,5 +44,6 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 
 ## 🧰 Host setup outside Docker (for cloud-init later)
 
-- **SandeepCloud:** Tailscale, with `tailscale serve --bg --tcp=3001 tcp://localhost:3001` so Uptime Kuma is reachable on the tailnet only. `/var/log/sandeepcloud-nginx/` for the Wazuh agent, rotated by the logrotate file above.
+- **SandeepCloud:** Tailscale, with `tailscale serve --bg --tcp=3001 tcp://localhost:3001` so Uptime Kuma is reachable on the tailnet only. `/var/log/sandeepcloud-nginx/` for the Wazuh agent, rotated by the logrotate file above. The DB dump cron job and `ubuntu`'s crontab above. A `git clone` of the wiki into `Molecular-Zettelkasten/ec2-deployment/LLM-Wiki`, using the deploy key from the backup.
+- **Both:** `server/backup/install.sh <host>`, then the restic credentials and a restore.
 - **Ad-Blocker:** Tailscale, host nginx, certbot (webroot `/var/www/certbot`, renewed by `certbot.timer`), and `/etc/nginx/sites-enabled/adguard` → `../sites-available/adguard`.

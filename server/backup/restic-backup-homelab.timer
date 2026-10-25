@@ -1,0 +1,13 @@
+# Weekly backup to the homelab over Tailscale. If the laptop is off, the run
+# fails and Uptime Kuma alerts; start it by hand once the laptop is back.
+[Unit]
+Description=Weekly restic backup to the homelab
+
+[Timer]
+OnCalendar=Sun *-*-* 07:00:00 UTC
+RandomizedDelaySec=15m
+Persistent=true
+Unit=restic-backup@homelab.service
+
+[Install]
+WantedBy=timers.target

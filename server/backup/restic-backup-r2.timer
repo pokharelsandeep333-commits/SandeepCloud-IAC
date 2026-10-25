@@ -1,0 +1,12 @@
+# Nightly backup to Cloudflare R2, after the 05:30 UTC MariaDB dump.
+[Unit]
+Description=Nightly restic backup to R2
+
+[Timer]
+OnCalendar=*-*-* 06:15:00 UTC
+RandomizedDelaySec=15m
+Persistent=true
+Unit=restic-backup@r2.service
+
+[Install]
+WantedBy=timers.target

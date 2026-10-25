@@ -1,0 +1,1 @@
+30 5 * * * root /usr/local/sbin/nextcloud-db-dump.sh >> /var/log/nextcloud-db-dump.log 2>&1

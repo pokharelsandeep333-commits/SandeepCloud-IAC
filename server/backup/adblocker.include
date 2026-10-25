@@ -1,0 +1,16 @@
+# What restic backs up on the Ad-Blocker (restic --files-from: one path or glob per line).
+# The query log (780 MB) and filter lists (72 MB) are left out: history and re-downloadable.
+
+# AdGuard Home: config (admin password hash, upstreams, filter settings), stats, sessions
+/opt/adguardhome/conf
+/opt/adguardhome/work/data/stats.db
+/opt/adguardhome/work/data/sessions.db
+
+# Dashboard allowlist (home IP)
+/etc/nginx/adguard-admin-allow.conf
+
+# Let's Encrypt account and the dns. certificate (saves a reissue on rebuild)
+/etc/letsencrypt
+
+# SSH authorized_keys
+/home/ubuntu/.ssh
