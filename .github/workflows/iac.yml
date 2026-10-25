@@ -6,7 +6,7 @@
 # match the ones run locally, and the Trivy and gitleaks binaries are checked
 # against SHA-256 hashes written here, not ones fetched at run time.
 
-name: iac
+name: 🏗️ IaC checks
 
 on:
   pull_request:
@@ -40,26 +40,31 @@ defaults:
 
 jobs:
   lint:
-    name: fmt, validate, TFLint
+    name: 🎨 Format · Validate · Lint
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 📥 Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      - name: 🧰 Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
           terraform_wrapper: false
 
-      - name: terraform fmt
+      - name: 🎨 terraform fmt
+        id: fmt
         run: terraform fmt -check -recursive -diff
 
       # Each root module, without a backend: CI has no AWS access and never reads state.
-      - name: terraform validate
+      - name: ✅ terraform validate
+        id: validate
+        if: ${{ !cancelled() }}
         run: |
           for dir in bootstrap envs/prod; do
             echo "::group::$dir"
@@ -68,40 +73,66 @@ jobs:
             echo "::endgroup::"
           done
 
-      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+      - name: 🧰 Set up TFLint
+        if: ${{ !cancelled() }}
+        uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
         with:
           tflint_version: ${{ env.TFLINT_VERSION }}
 
       # The token only raises the API rate limit for the plugin download.
-      - name: tflint
+      - name: 🔍 TFLint
+        id: tflint
+        if: ${{ !cancelled() }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
           tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
 
+      - name: 📝 Summary
+        if: ${{ !cancelled() }}
+        env:
+          FMT: ${{ steps.fmt.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          TFLINT: ${{ steps.tflint.outcome }}
+        run: |
+          icon() { case "$1" in success) echo "✅ passed" ;; failure) echo "❌ failed" ;; *) echo "⏭️ $1" ;; esac; }
+          {
+            echo "## 🎨 Format · Validate · Lint"
+            echo
+            echo "| Check | Scope | Result |"
+            echo "|---|---|---|"
+            echo "| 🎨 \`terraform fmt\` | whole repo | $(icon "$FMT") |"
+            echo "| ✅ \`terraform validate\` | \`bootstrap\`, \`envs/prod\` | $(icon "$VALIDATE") |"
+            echo "| 🔍 TFLint + AWS ruleset | every module | $(icon "$TFLINT") |"
+            echo
+            echo "<sub>Terraform $TERRAFORM_VERSION · TFLint $TFLINT_VERSION</sub>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   scan:
-    name: Checkov and Trivy
+    name: 🛡️ Security scan · Checkov + Trivy
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
       security-events: write # upload SARIF to code scanning
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 📥 Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
-      - name: Install Checkov
+      - name: 📦 Install Checkov
         run: python -m pip install --disable-pip-version-check "checkov==$CHECKOV_VERSION"
 
       # Phase 2 reports findings without failing the build: they describe the
       # account as it is today and are triaged in Phase 3, which removes --soft-fail.
-      - name: checkov
+      - name: 🛡️ Checkov
         run: |
           checkov --directory . --framework terraform github_actions \
             --download-external-modules false --soft-fail \
@@ -110,7 +141,7 @@ jobs:
       # Checkov keeps inline-skipped checks in its SARIF (marked as suppressed),
       # and code scanning opens them as alerts anyway. The #checkov:skip line and
       # its reason are the record of an accepted risk, so they don't upload.
-      - name: Drop skipped checks from the Checkov SARIF
+      - name: 🧹 Drop skipped checks from the Checkov SARIF
         run: |
           python - <<'EOF'
           import json
@@ -125,9 +156,11 @@ jobs:
           with open(path, "w", encoding="utf-8") as f:
               json.dump(sarif, f)
           print(f"Dropped {dropped} suppressed result(s) from {path}")
+          with open("checkov-skipped.txt", "w", encoding="utf-8") as f:
+              f.write(str(dropped))
           EOF
 
-      - name: Install Trivy
+      - name: 📦 Install Trivy
         run: |
           tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           curl -fsSLo "$RUNNER_TEMP/$tarball" \
@@ -137,40 +170,86 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       # Same rule as Checkov: report now, fail from Phase 3 (--exit-code 1).
-      - name: trivy
+      - name: 🔎 Trivy
         run: |
           trivy config --exit-code 0 .
           trivy config --quiet --exit-code 0 --format sarif --output trivy.sarif .
 
       # A fork's token can't write security events, so only upload for this repo's own branches.
-      - name: Upload Checkov SARIF
+      - name: 📤 Upload Checkov results to code scanning
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: checkov.sarif
           category: checkov
 
-      - name: Upload Trivy SARIF
+      - name: 📤 Upload Trivy results to code scanning
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: trivy.sarif
           category: trivy
 
+      - name: 📝 Summary
+        if: ${{ !cancelled() }}
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import collections, json, os
+
+          def results(path):
+              if not os.path.exists(path):
+                  return None
+              with open(path, encoding="utf-8") as f:
+                  return [r for run in json.load(f)["runs"] for r in run["results"]]
+
+          skipped = open("checkov-skipped.txt").read() if os.path.exists("checkov-skipped.txt") else "?"
+          tools = [("🛡️ Checkov", results("checkov.sarif")), ("🔎 Trivy", results("trivy.sarif"))]
+
+          print("## 🛡️ Security scan")
+          print()
+          print("| Scanner | Findings | Rules | Skipped inline |")
+          print("|---|---:|---:|---:|")
+          for name, res in tools:
+              if res is None:
+                  print(f"| {name} | ⚠️ no results file | | |")
+              else:
+                  rules = len({r["ruleId"] for r in res})
+                  print(f"| {name} | {len(res)} | {rules} | {skipped if 'Checkov' in name else '–'} |")
+          print()
+          print("> ℹ️ **Report-only until Phase 3.** Every finding describes the live account as imported, "
+                "and each one is either fixed or skipped in code with a reason. Then these scanners fail the build.")
+          for name, res in tools:
+              if not res:
+                  continue
+              print()
+              print(f"<details><summary>{name}: findings by rule</summary>")
+              print()
+              print("| Rule | Count |")
+              print("|---|---:|")
+              for rule, n in collections.Counter(r["ruleId"] for r in res).most_common():
+                  print(f"| `{rule}` | {n} |")
+              print()
+              print("</details>")
+          print()
+          print(f"<sub>Checkov {os.environ['CHECKOV_VERSION']} · Trivy {os.environ['TRIVY_VERSION']} · "
+                "full detail in the Security tab → Code scanning</sub>")
+          EOF
+
   gitleaks:
-    name: gitleaks
+    name: 🔐 Secret scan · gitleaks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
       # Full history: a secret that was ever committed counts, even if a later commit removed it.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 📥 Checkout (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install gitleaks
+      - name: 📦 Install gitleaks
         run: |
           tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           curl -fsSLo "$RUNNER_TEMP/$tarball" \
@@ -180,5 +259,27 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       # Fails the job on any finding; --redact keeps the secret itself out of the log.
-      - name: gitleaks
+      - name: 🔐 gitleaks
+        id: gitleaks
         run: gitleaks git --redact --no-banner --verbose .
+
+      - name: 📝 Summary
+        if: ${{ !cancelled() }}
+        env:
+          OUTCOME: ${{ steps.gitleaks.outcome }}
+        run: |
+          commits=$(git rev-list --count HEAD)
+          case "$OUTCOME" in
+            success) result="✅ No secrets found" ;;
+            failure) result="❌ Possible secret found. See the gitleaks step log (values are redacted)" ;;
+            *)       result="⏭️ $OUTCOME" ;;
+          esac
+          {
+            echo "## 🔐 Secret scan"
+            echo
+            echo "| Scope | Result |"
+            echo "|---|---|"
+            echo "| 📜 Full git history, $commits commits | $result |"
+            echo
+            echo "<sub>gitleaks $GITLEAKS_VERSION</sub>"
+          } >> "$GITHUB_STEP_SUMMARY"
