@@ -1,0 +1,5 @@
+# IPs allowed to reach the AdGuard dashboard (everything except /dns-query).
+# Copy to /etc/nginx/adguard-admin-allow.conf and put the real home IP in.
+# The real file is gitignored: the repo is public and the home IP is a personal value.
+# Add a line, then: sudo nginx -t && sudo systemctl reload nginx
+allow <HOME_IP>;   # home
