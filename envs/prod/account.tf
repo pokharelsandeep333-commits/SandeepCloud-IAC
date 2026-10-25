@@ -5,7 +5,12 @@
 # --- CloudTrail -----------------------------------------------------------------
 # The only trail. Don't add a second one: a second copy of management events is billed.
 
+#trivy:ignore:AVD-AWS-0015 SSE-S3 instead of a customer-managed KMS key, same reason as CKV_AWS_35 below
+#trivy:ignore:AVD-AWS-0162 No CloudWatch Logs, same reason as CKV2_AWS_10 below
 resource "aws_cloudtrail" "account" {
+  #checkov:skip=CKV_AWS_35:SSE-S3 instead of a customer-managed KMS key ($1/month); the Wazuh reader would also need kms:Decrypt in its CloudFormation stack
+  #checkov:skip=CKV2_AWS_10:CloudWatch Logs ingestion is billed; Wazuh reads the trail bucket and is where the logs get analysed
+  #checkov:skip=CKV_AWS_252:Nothing consumes per-log-file SNS notifications; Wazuh polls the bucket
   name                          = "sandeepcloud-account-trail"
   s3_bucket_name                = aws_s3_bucket.cloudtrail.id
   is_multi_region_trail         = true
@@ -24,7 +29,12 @@ resource "aws_cloudtrail" "account" {
 # The Wazuh manager reads this bucket (CloudFormation stack wazuh-cloudtrail-reader),
 # so its name and policy have to keep working.
 
+#trivy:ignore:AVD-AWS-0089 Access logging skipped, same reason as CKV_AWS_18 below
 resource "aws_s3_bucket" "cloudtrail" {
+  #checkov:skip=CKV_AWS_18:Access logging needs a second bucket; CloudTrail already records bucket-level changes
+  #checkov:skip=CKV_AWS_144:Cross-region replication doubles storage; Wazuh already keeps an off-account copy of the trail
+  #checkov:skip=CKV_AWS_145:SSE-S3 instead of a customer-managed KMS key ($1/month); the Wazuh reader would also need kms:Decrypt in its CloudFormation stack
+  #checkov:skip=CKV2_AWS_62:Wazuh polls the bucket; nothing consumes event notifications
   bucket = local.cloudtrail_bucket
 
   lifecycle {
@@ -49,6 +59,7 @@ resource "aws_s3_bucket_ownership_controls" "cloudtrail" {
   }
 }
 
+#trivy:ignore:AVD-AWS-0132 SSE-S3 instead of a customer-managed KMS key, same reason as CKV_AWS_145
 resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
@@ -59,6 +70,17 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
     }
+  }
+}
+
+# Versioning makes a deleted or overwritten log file recoverable for 30 days
+# (the noncurrent rule below). Trail logs are written once, so it costs almost
+# nothing. Once enabled, versioning can be suspended but never removed.
+resource "aws_s3_bucket_versioning" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+
+  versioning_configuration {
+    status = "Enabled"
   }
 }
 
@@ -74,7 +96,36 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
     expiration {
       days = 365
     }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
   }
+
+  # With versioning, expiring a log leaves a delete marker. This clears a
+  # marker once its noncurrent version is gone. (Can't share the rule above:
+  # expired_object_delete_marker and days are exclusive in one expiration block.)
+  rule {
+    id     = "clean-expired-delete-markers"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  # Lifecycle rules for noncurrent versions need versioning in place first.
+  depends_on = [aws_s3_bucket_versioning.cloudtrail]
 }
 
 resource "aws_s3_bucket_policy" "cloudtrail" {

@@ -86,6 +86,15 @@ variable "ingress_rules" {
     condition     = alltrue([for r in values(var.ingress_rules) : r.port != 22])
     error_message = "No ingress on port 22: SSH goes over Tailscale."
   }
+
+  # AWS rejects anything else in a rule description, but only at apply time.
+  validation {
+    condition = alltrue([
+      for r in values(var.ingress_rules) :
+      r.description == null || can(regex("^[a-zA-Z0-9 ._:/()#,@\\[\\]+=&;{}!$*-]{0,255}$", r.description))
+    ])
+    error_message = "Rule descriptions allow only letters, digits, spaces and ._-:/()#,@[]+=&;{}!$* (no apostrophes), up to 255 characters."
+  }
 }
 
 variable "status_alarms" {

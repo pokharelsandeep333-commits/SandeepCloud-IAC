@@ -130,8 +130,9 @@ jobs:
       - name: 📦 Install Checkov
         run: python -m pip install --disable-pip-version-check "checkov==$CHECKOV_VERSION"
 
-      # Phase 2 reports findings without failing the build: they describe the
-      # account as it is today and are triaged in Phase 3, which removes --soft-fail.
+      # Both scanners always write their SARIF and never stop the job themselves,
+      # so the upload and summary still happen when something is found. The
+      # gate step at the end fails the build on any finding.
       - name: 🛡️ Checkov
         run: |
           checkov --directory . --framework terraform github_actions \
@@ -169,7 +170,6 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" trivy
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
-      # Same rule as Checkov: report now, fail from Phase 3 (--exit-code 1).
       - name: 🔎 Trivy
         run: |
           trivy config --exit-code 0 .
@@ -216,8 +216,13 @@ jobs:
                   rules = len({r["ruleId"] for r in res})
                   print(f"| {name} | {len(res)} | {rules} | {skipped if 'Checkov' in name else '–'} |")
           print()
-          print("> ℹ️ **Report-only until Phase 3.** Every finding describes the live account as imported, "
-                "and each one is either fixed or skipped in code with a reason. Then these scanners fail the build.")
+          total = sum(len(res or []) for _, res in tools)
+          if total == 0 and all(res is not None for _, res in tools):
+              print("> 🚦 **Gate passed.** No open findings. Accepted risks are skipped in code with a reason "
+                    "and listed in the README.")
+          else:
+              print("> 🚦 **Gate failed.** Any finding fails the build: fix it, or skip it in code "
+                    "with a reason and add it to the README's accepted-risk table.")
           for name, res in tools:
               if not res:
                   continue
@@ -233,6 +238,34 @@ jobs:
           print()
           print(f"<sub>Checkov {os.environ['CHECKOV_VERSION']} · Trivy {os.environ['TRIVY_VERSION']} · "
                 "full detail in the Security tab → Code scanning</sub>")
+          EOF
+
+      # Counts what's left after inline skips, from the same SARIF that was uploaded.
+      - name: 🚦 Gate (fail on any finding)
+        if: ${{ !cancelled() }}
+        run: |
+          python - <<'EOF'
+          import json, os, sys
+
+          def esc(text):  # workflow-command escaping; Trivy's messages span several lines
+              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          failed = False
+          for path in ("checkov.sarif", "trivy.sarif"):
+              if not os.path.exists(path):
+                  print(f"::error::{path} is missing, so the scan didn't finish")
+                  failed = True
+                  continue
+              with open(path, encoding="utf-8") as f:
+                  results = [r for run in json.load(f)["runs"] for r in run["results"]]
+              for r in results:
+                  loc = r.get("locations", [{}])[0].get("physicalLocation", {})
+                  file = loc.get("artifactLocation", {}).get("uri", "?")
+                  line = loc.get("region", {}).get("startLine", 1)
+                  print(f"::error file={file},line={line}::{esc(r['ruleId'] + ': ' + r['message']['text'])}")
+              print(f"{path}: {len(results)} finding(s)")
+              failed = failed or bool(results)
+          sys.exit(1 if failed else 0)
           EOF
 
   gitleaks:

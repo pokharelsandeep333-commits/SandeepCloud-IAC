@@ -29,20 +29,6 @@ terraform plan
 
 The last `plan` should print `No changes.`
 
-## Known scanner findings
+## Scanner findings
 
-These describe the account as it is today. Fixing them changes live resources, so they're triaged in Phase 3: fixed if free, otherwise skipped in code with a reason and listed in the main README.
-
-| Finding | Resource |
-|---|---|
-| Versioning off (CKV_AWS_21, AVD-AWS-0090) | trail bucket |
-| No customer-managed KMS key (CKV_AWS_35, CKV_AWS_145, AVD-AWS-0015, AVD-AWS-0132) | trail, trail bucket |
-| No access logging, replication or event notifications (CKV_AWS_18, CKV_AWS_144, CKV2_AWS_62, AVD-AWS-0089) | trail bucket |
-| No abort-multipart rule (CKV_AWS_300) | trail bucket lifecycle |
-| No CloudWatch Logs or SNS on the trail (CKV2_AWS_10, CKV_AWS_252, AVD-AWS-0162) | trail |
-| Detailed monitoring off, no instance profile (CKV_AWS_126, CKV2_AWS_41) | both instances |
-| Rules without descriptions (CKV_AWS_23, AVD-AWS-0124) | Ad-Blocker rules, both egress rules |
-| Port 80 open to the internet (CKV_AWS_260) | Ad-Blocker. Public DoH is the product, so this one is accepted |
-| Unrestricted egress (AVD-AWS-0104) | both security groups |
-
-Since the module refactor, Checkov and Trivy no longer report the missing descriptions on the Ad-Blocker's two ingress rules. They can't follow a `null` description through the module's `ingress_rules` variable. **The rules still have no description.** The finding stays on this list until Phase 3 adds one.
+Phase 3 took the first scan's 25 findings to zero. The free ones were fixed: versioning and multipart cleanup on the trail bucket, and descriptions on every security group rule. The rest are skipped in code, each with its reason (`#checkov:skip` / `#trivy:ignore` next to the resource), and listed in the [root README's accepted-risk table](../../README.md#️-accepted-risks). CI fails on any new finding.
