@@ -2,132 +2,84 @@
 # design; SSH only over Tailscale. The AdGuard dashboard's home-IP lock lives
 # in nginx on the server, not in AWS.
 
-resource "aws_instance" "adblocker" {
-  ami                     = "ami-0b6d9d3d33ba97d99"
-  instance_type           = "t3.micro"
-  subnet_id               = data.aws_subnet.default_c.id
-  vpc_security_group_ids  = [aws_security_group.adblocker.id]
-  key_name                = aws_key_pair.adblocker.key_name
-  disable_api_termination = true
-  ebs_optimized           = true
-  monitoring              = false
+module "adblocker" {
+  source = "../../modules/web-host"
+  count  = var.enable_adblocker ? 1 : 0
 
-  credit_specification {
-    cpu_credits = "standard"
-  }
+  name             = "adblocker"
+  instance_name    = "Ad-Blocker-Server"
+  ami              = "ami-0b6d9d3d33ba97d99"
+  instance_type    = "t3.micro"
+  cpu_credits      = "standard"
+  root_volume_size = 25
+  root_volume_name = "adblocker-root"
+  backup_tag       = "sandeepcloud-daily"
+  subnet_id        = data.aws_subnet.default_c.id
+  vpc_id           = data.aws_vpc.default.id
 
-  metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 1
-    instance_metadata_tags      = "disabled"
-  }
-
-  root_block_device {
-    volume_type           = "gp3"
-    volume_size           = 25
-    iops                  = 3000
-    throughput            = 125
-    encrypted             = true
-    delete_on_termination = true
-
-    tags = {
-      Name   = "adblocker-root"
-      Backup = "sandeepcloud-daily"
-    }
-  }
-
-  tags = {
-    Name = "Ad-Blocker-Server"
-  }
-
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [ami, user_data]
-  }
-}
-
-resource "aws_eip" "adblocker" {
-  domain = "vpc"
-}
-
-resource "aws_eip_association" "adblocker" {
-  allocation_id = aws_eip.adblocker.id
-  instance_id   = aws_instance.adblocker.id
-}
-
-resource "aws_key_pair" "adblocker" {
   key_name   = "Ad Key"
   public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqQFJF6+TKcIfdsZbeJVUZWloEnRPnlIAB5DhtkcQeGtIGWeBLE3KLMmiEyqmMu83IhQzjwSGGyfdPTtMbwi0DXD2XSt19+n6iSWWdbZtPNV1i/K5pa/UdF5C9tUsgHbB5a4CRsRG6wbgGx3QP/48+lqaGFu4ExvqddU3zyGyhmN8rNmf4IDsRzXiNl860gQDJ/GNSlasC2U1ALz6J5uXyOJEePxmmbVKZms6zGHQCGSTLe5gV8ys1RntDYqP94uiBrS5h3LV8E0Ls8X2yVIt7AsWwCz637cNI+6hBq4sWxurxQM6TjEDHrgLPp3zAbcnYgkL5LfXdstGrl+mm3YA7 Ad Key"
 
-  # Same reason as aws_key_pair.sandeepcloud.
-  lifecycle {
-    ignore_changes = [public_key]
+  # Renaming this to adblocker-sg forces a new group, so it's a planned change, not part of the import.
+  security_group_name        = "launch-wizard-3"
+  security_group_description = "launch-wizard-3 created 2026-07-29T17:40:24.932Z"
+  ingress_rules = {
+    http  = { port = 80, cidr = "0.0.0.0/0" }
+    https = { port = 443, cidr = "0.0.0.0/0" }
   }
+
+  status_alarms = true
 }
 
-# Renaming this to adblocker-sg forces a new group, so it's a planned change, not part of the import.
-resource "aws_security_group" "adblocker" {
-  name        = "launch-wizard-3"
-  description = "launch-wizard-3 created 2026-07-29T17:40:24.932Z"
-  vpc_id      = data.aws_vpc.default.id
+# The resources were flat in this folder until the module refactor (2026-10-24).
+# These blocks move them in state, so nothing is destroyed or recreated.
+
+moved {
+  from = aws_instance.adblocker
+  to   = module.adblocker[0].aws_instance.this
 }
 
-resource "aws_vpc_security_group_ingress_rule" "adblocker_http" {
-  security_group_id = aws_security_group.adblocker.id
-  ip_protocol       = "tcp"
-  from_port         = 80
-  to_port           = 80
-  cidr_ipv4         = "0.0.0.0/0"
+moved {
+  from = aws_eip.adblocker
+  to   = module.adblocker[0].aws_eip.this
 }
 
-resource "aws_vpc_security_group_ingress_rule" "adblocker_https" {
-  security_group_id = aws_security_group.adblocker.id
-  ip_protocol       = "tcp"
-  from_port         = 443
-  to_port           = 443
-  cidr_ipv4         = "0.0.0.0/0"
+moved {
+  from = aws_eip_association.adblocker
+  to   = module.adblocker[0].aws_eip_association.this
 }
 
-resource "aws_vpc_security_group_egress_rule" "adblocker_all" {
-  security_group_id = aws_security_group.adblocker.id
-  ip_protocol       = "-1"
-  cidr_ipv4         = "0.0.0.0/0"
+moved {
+  from = aws_key_pair.adblocker
+  to   = module.adblocker[0].aws_key_pair.this
 }
 
-# Status-check alarms that reboot or recover the instance on their own.
-resource "aws_cloudwatch_metric_alarm" "adblocker_status_instance" {
-  alarm_name          = "adblocker-status-instance"
-  alarm_description   = "Ad-Blocker-Server - reboot instance on instance status check failure"
-  namespace           = "AWS/EC2"
-  metric_name         = "StatusCheckFailed_Instance"
-  statistic           = "Maximum"
-  period              = 60
-  evaluation_periods  = 3
-  threshold           = 1
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  treat_missing_data  = "missing"
-  alarm_actions       = ["arn:aws:automate:${var.region}:ec2:reboot"]
-
-  dimensions = {
-    InstanceId = aws_instance.adblocker.id
-  }
+moved {
+  from = aws_security_group.adblocker
+  to   = module.adblocker[0].aws_security_group.this
 }
 
-resource "aws_cloudwatch_metric_alarm" "adblocker_status_system" {
-  alarm_name          = "adblocker-status-system"
-  alarm_description   = "Ad-Blocker-Server - recover instance on AWS system status check failure"
-  namespace           = "AWS/EC2"
-  metric_name         = "StatusCheckFailed_System"
-  statistic           = "Maximum"
-  period              = 60
-  evaluation_periods  = 2
-  threshold           = 1
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  treat_missing_data  = "missing"
-  alarm_actions       = ["arn:aws:automate:${var.region}:ec2:recover"]
+moved {
+  from = aws_vpc_security_group_ingress_rule.adblocker_http
+  to   = module.adblocker[0].aws_vpc_security_group_ingress_rule.this["http"]
+}
 
-  dimensions = {
-    InstanceId = aws_instance.adblocker.id
-  }
+moved {
+  from = aws_vpc_security_group_ingress_rule.adblocker_https
+  to   = module.adblocker[0].aws_vpc_security_group_ingress_rule.this["https"]
+}
+
+moved {
+  from = aws_vpc_security_group_egress_rule.adblocker_all
+  to   = module.adblocker[0].aws_vpc_security_group_egress_rule.all
+}
+
+moved {
+  from = aws_cloudwatch_metric_alarm.adblocker_status_instance
+  to   = module.adblocker[0].aws_cloudwatch_metric_alarm.status_instance[0]
+}
+
+moved {
+  from = aws_cloudwatch_metric_alarm.adblocker_status_system
+  to   = module.adblocker[0].aws_cloudwatch_metric_alarm.status_system[0]
 }

@@ -2,3 +2,7 @@
 account_id = "<ACCOUNT_ID>"
 region     = "us-east-1"
 alert_email = "<YOUR_EMAIL>"
+
+# Each server can be built alone. Both default to true.
+# enable_sandeepcloud = true
+# enable_adblocker    = true
