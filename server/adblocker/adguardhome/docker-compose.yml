@@ -1,0 +1,19 @@
+# AdGuard Home. On the live server this container was started with `docker run`,
+# not compose. This file is rebuilt from `docker inspect adguardhome` on
+# 2026-10-25 so a new server can start it the same way.
+# Only the web/DoH port is published, on localhost; host nginx terminates TLS
+# and proxies /dns-query to it (see ../nginx/).
+# /opt/adguardhome/conf/AdGuardHome.yaml holds the admin password hash and the
+# filter settings: it goes in the encrypted backup, never in this repo.
+services:
+  adguardhome:
+    image: adguard/adguardhome:v0.107.79@sha256:aba9e3bf0613be3ba3755e1fc311b126e2c24bec25e18b6483894a88283074f0
+    container_name: adguardhome
+    restart: unless-stopped
+    command: ["--no-check-update", "-c", "/opt/adguardhome/conf/AdGuardHome.yaml", "-w", "/opt/adguardhome/work"]
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - /opt/adguardhome/conf:/opt/adguardhome/conf
+      - /opt/adguardhome/work:/opt/adguardhome/work
+    network_mode: bridge

@@ -1,0 +1,18 @@
+# Uptime Kuma: site monitoring + dead-man's switch for the homelab laptop (2026-10-14).
+# Reachable ONLY via Tailscale Serve (tailscale serve --bg --tcp=3001 tcp://localhost:3001); never published publicly.
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:2.5.6
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - ./data:/app/data
+    mem_limit: 256m
+    pids_limit: 200
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
