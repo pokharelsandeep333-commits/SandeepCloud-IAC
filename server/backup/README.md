@@ -32,11 +32,13 @@ These open the backups, so they can't live inside them. Keep them in your passwo
 
 1. **The restic password**, the same for every repository. Also keep an **offline copy** (paper or USB). If it's lost, every backup is unreadable.
 2. **The R2 token:** Object Read & Write, limited to the backup bucket.
-3. **The rest-server password** on the homelab.
+3. **The rest-server passwords:** one login per server on the homelab (`sandeepcloud`, `adblocker`).
 
 On each server they sit in `/etc/restic/` (root, 0600), never in git.
 
 ## 🚀 Setting it up (Sandeep, once per server)
+
+`install.sh` needs `curl`, `bunzip2`, `sha256sum` and `systemctl`, and stops before downloading anything if one is missing. Minimal Ubuntu images (the Ad-Blocker's 26.04) lack `bunzip2`: run `sudo apt install bzip2` first. The homelab end has to be running before `restic-target homelab init` (next section).
 
 ```bash
 # On the server, from a checkout of this repo
@@ -52,6 +54,23 @@ sudo systemctl enable --now restic-backup-r2.timer restic-backup-homelab.timer
 ```
 
 Each server uses its own repository path (`.../<BUCKET>/sandeepcloud`, `.../<BUCKET>/adblocker`) in the same bucket.
+
+## 🏠 The homelab end (rest-server)
+
+The weekly copy goes to restic's [rest-server](https://github.com/restic/rest-server) on the homelab laptop (WSL Ubuntu 24.04, Docker Engine). Its compose file is [`../homelab/rest-server/docker-compose.yml`](../homelab/rest-server/docker-compose.yml): rest-server 0.14.0, pinned by digest, in a read-only container.
+
+- **`--append-only`:** a server can add snapshots but can't delete or rewrite old ones (a DELETE gets 403, tested 2026-10-25).
+- **`--private-repos`:** each login reaches only its own path, `sandeepcloud/` or `adblocker/` (the other server's login gets 401, tested).
+- **Tailscale only:** the Tailscale policy lets `tag:server` reach the laptop on `tcp:8000` and nothing else. WSL blocks the LAN address by default, and no extra Windows firewall rule is needed.
+- **A 1 MB tmpfs on `/tmp`:** `create_user` (htpasswd) fails in a read-only container without a temp dir.
+
+```bash
+# On the laptop, in the folder holding the compose file
+docker compose up -d
+docker exec -it rest_server create_user sandeepcloud   # prompts for the password; repeat for adblocker
+```
+
+The password goes in that server's `/etc/restic/homelab.env` as `RESTIC_REST_PASSWORD`. New users are picked up within about 30 seconds, without a restart.
 
 ## 🔔 Alerts
 
@@ -77,7 +96,7 @@ The full rebuild order (Terraform, cloud-init, restore, DNS) goes in `docs/RUNBO
 ## 🧭 Choices and limits
 
 - **Retention (R2):** 7 daily, 4 weekly, 6 monthly, pruned by the server after each run. Set in `/etc/restic/backup.conf`.
-- **Homelab is append-only** (rest-server `--append-only`): a compromised server can add snapshots but can't delete old ones. Pruning there runs on the laptop. **R2 has no such guard,** since the token can delete. The homelab copy is the one that survives a compromised server.
+- **Homelab is append-only** (rest-server `--append-only`): a compromised server can add snapshots but can't delete old ones. Pruning there has to run on the laptop, and isn't set up yet (manual or scheduled is still open; the restic password stays off the laptop). **R2 has no such guard,** since the token can delete. The homelab copy is the one that survives a compromised server.
 - **The homelab laptop must be on** Sunday morning. If it isn't, the run fails and alerts; run `systemctl start restic-backup@homelab` once it's back.
 - **SQLite files (Uptime Kuma, Hermes, AdGuard stats) are copied while the apps run.** Usually fine, but not guaranteed consistent. The irreplaceable data (Nextcloud files and the DB dump) doesn't have this problem.
 - **Nextcloud isn't put in maintenance mode.** Files changed between the 05:30 dump and the 06:15 backup can disagree slightly with the DB; `occ files:scan --all` after a restore fixes that.
