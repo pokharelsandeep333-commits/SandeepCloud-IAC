@@ -1,0 +1,3 @@
+// Audit H4: apply kernel/security updates that need a reboot automatically, at a quiet hour (UTC)
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:30";

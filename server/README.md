@@ -17,6 +17,9 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | `sandeepcloud/cron.d-nextcloud-db-dump` | `/etc/cron.d/nextcloud-db-dump` | Copied as-is: runs the dump at 05:30 UTC |
 | `sandeepcloud/crontab-ubuntu` | `ubuntu`'s crontab | Copied as-is: Nextcloud `cron.php` every 5 minutes, wiki `git pull` every minute |
 | `backup/` | `/etc/restic`, `/usr/local/sbin`, systemd | Written new: restic backups to R2 and the homelab. See [`backup/README.md`](backup/README.md) |
+| `provision/` | first boot (cloud-init) and `restore.sh` | Written new: rebuilds either server on any cloud, then restores it. See [`provision/README.md`](provision/README.md) |
+| `sandeepcloud/host/etc/...` | the same path under `/etc` | Copied as-is (2026-10-26): the CIS and audit hardening, applied by `provision/bootstrap.sh` |
+| `adblocker/host/etc/...` | the same path under `/etc` | Copied as-is (2026-10-26): sshd and journald drop-ins |
 | `homelab/rest-server/docker-compose.yml` | the homelab laptop (WSL), not either server | Written new: the append-only restic target for the weekly backups. See [`backup/README.md`](backup/README.md#-the-homelab-end-rest-server) |
 | `adblocker/adguardhome/docker-compose.yml` | none (started with `docker run`) | Rebuilt from `docker inspect` |
 | `adblocker/nginx/nginx.conf` | `/etc/nginx/nginx.conf` | Copied as-is (Ubuntu default + `server_tokens off`) |
@@ -43,7 +46,9 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | `/home/ubuntu/uptime-kuma/data/` | |
 | `/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/LLM-Wiki/` (the wiki the `arc-vault` container serves) | |
 
-## 🧰 Host setup outside Docker (for cloud-init later)
+## 🧰 Host setup outside Docker
+
+[`provision/`](provision/) now does all of this: `bootstrap.sh` on first boot, `restore.sh` by hand. The list stays as the plain-language version.
 
 - **SandeepCloud:** Tailscale, with `tailscale serve --bg --tcp=3001 tcp://localhost:3001` so Uptime Kuma is reachable on the tailnet only. `/var/log/sandeepcloud-nginx/` for the Wazuh agent, rotated by the logrotate file above. The DB dump cron job and `ubuntu`'s crontab above. A `git clone` of the wiki into `Molecular-Zettelkasten/ec2-deployment/LLM-Wiki`, using the deploy key from the backup.
 - **Both:** `server/backup/install.sh <host>`, then the restic credentials and a restore.

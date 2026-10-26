@@ -1,0 +1,37 @@
+#cloud-config
+# First boot of a SandeepCloud server, on any cloud whose Ubuntu 24.04/26.04 image runs
+# cloud-init (AWS user_data, Azure custom_data, GCP/Oracle/Hetzner user data).
+# Terraform renders it with templatefile(path, { host, ssh_public_key, repo_ref }).
+#
+# No secrets in here: user data is stored in Terraform state and readable from inside
+# the VM. The keys come in later, by hand, through restore.sh.
+#
+# Changing this file doesn't touch a running server: cloud-init only reads it on the
+# first boot, and the instance ignores user_data changes (ignore_changes).
+hostname: ${host}
+timezone: Etc/UTC
+
+# Everything in the backups lives under /home/ubuntu with numeric owners (uid 1000).
+# Azure: set admin_username = "ubuntu" so the platform doesn't add a second admin.
+users:
+  - name: ubuntu
+    gecos: Ubuntu
+    groups: [adm, sudo]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+package_update: true
+package_upgrade: true
+packages: [git, ca-certificates, curl, gnupg]
+
+# The public repo, at the commit Terraform pins, then the rest of the setup from it.
+runcmd:
+  - [git, clone, --quiet, "https://github.com/pokharelsandeep333-commits/SandeepCloud-IAC.git", /home/ubuntu/SandeepCloud-IAC]
+  - [git, -C, /home/ubuntu/SandeepCloud-IAC, checkout, --quiet, "${repo_ref}"]
+  - [chown, -R, "ubuntu:ubuntu", /home/ubuntu/SandeepCloud-IAC]
+  - [/home/ubuntu/SandeepCloud-IAC/server/provision/bootstrap.sh, "${host}"]
+
+final_message: "cloud-init finished after $UPTIME s. Check: cloud-init status --long. Next, as root: /home/ubuntu/SandeepCloud-IAC/server/provision/restore.sh ${host}"
