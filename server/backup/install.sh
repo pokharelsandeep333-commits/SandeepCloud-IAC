@@ -24,6 +24,13 @@ if [ "$(id -u)" -ne 0 ]; then
   echo "run as root (sudo)" >&2
   exit 1
 fi
+# Minimal images can lack bunzip2 (the Ad-Blocker's Ubuntu 26.04 did); fail before downloading.
+for cmd in curl bunzip2 sha256sum systemctl; do
+  if ! command -v "$cmd" >/dev/null; then
+    echo "missing $cmd; install it first (bunzip2: sudo apt install bzip2)" >&2
+    exit 1
+  fi
+done
 here="$(cd "$(dirname "$0")" && pwd)"
 
 # restic: the pinned release binary, checksum-verified

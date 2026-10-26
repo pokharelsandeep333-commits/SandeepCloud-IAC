@@ -1,0 +1,33 @@
+# restic rest-server on the homelab laptop (WSL Ubuntu-24.04, Docker Engine, mirrored networking).
+# The second, append-only copy of both servers' backups (server/backup/).
+#
+# Reachable only over Tailscale (tested 2026-10-25: LAN times out; servers get 401 until logged in):
+#   - Tailscale policy v6: tag:server -> wazuh-laptop tcp:8000, nothing else
+#   - WSL's Hyper-V firewall blocks inbound by default. Tailscale's own "Tailscale-In" rules allow
+#     anything addressed to the laptop's Tailscale IP, so the policy above is the filter there,
+#     and no extra firewall rule is needed. The LAN address stays blocked.
+#
+# --append-only:   a server can add snapshots but can't delete or rewrite old ones
+# --private-repos: user "sandeepcloud" only reaches /sandeepcloud/, "adblocker" only /adblocker/
+# Users: docker exec -it rest_server create_user <name>   (prompts for the password)
+services:
+  rest-server:
+    image: restic/rest-server:0.14.0@sha256:d2aff06f47eb38637dff580c3e6bce4af98f386c396a25d32eb6727ec96214a5
+    container_name: rest_server
+    restart: unless-stopped
+    environment:
+      OPTIONS: "--append-only --private-repos"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=1m,mode=1777 # create_user/delete_user (htpasswd) need a temp dir
+    mem_limit: 256m
+    pids_limit: 100
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

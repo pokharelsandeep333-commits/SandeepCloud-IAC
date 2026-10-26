@@ -17,6 +17,7 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | `sandeepcloud/cron.d-nextcloud-db-dump` | `/etc/cron.d/nextcloud-db-dump` | Copied as-is: runs the dump at 05:30 UTC |
 | `sandeepcloud/crontab-ubuntu` | `ubuntu`'s crontab | Copied as-is: Nextcloud `cron.php` every 5 minutes, wiki `git pull` every minute |
 | `backup/` | `/etc/restic`, `/usr/local/sbin`, systemd | Written new: restic backups to R2 and the homelab. See [`backup/README.md`](backup/README.md) |
+| `homelab/rest-server/docker-compose.yml` | the homelab laptop (WSL), not either server | Written new: the append-only restic target for the weekly backups. See [`backup/README.md`](backup/README.md#-the-homelab-end-rest-server) |
 | `adblocker/adguardhome/docker-compose.yml` | none (started with `docker run`) | Rebuilt from `docker inspect` |
 | `adblocker/nginx/nginx.conf` | `/etc/nginx/nginx.conf` | Copied as-is (Ubuntu default + `server_tokens off`) |
 | `adblocker/nginx/conf.d/00-adguard-common.conf` | `/etc/nginx/conf.d/` | Copied as-is |
