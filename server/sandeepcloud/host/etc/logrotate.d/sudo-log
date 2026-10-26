@@ -1,0 +1,11 @@
+# sudo's own log (Defaults logfile=/var/log/sudo.log, CIS 35664). Added 2026-10-09.
+/var/log/sudo.log {
+    monthly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+    su root syslog
+    create 0600 root root
+}

@@ -9,6 +9,8 @@ Encrypted, off-account backups of both servers with [restic](https://restic.net)
 | SandeepCloud | ~1 GB: Nextcloud (config, files, custom apps), the nightly MariaDB dumps, every `.env`, the Cloudflare origin cert, Watchtower's registry login, Uptime Kuma, Hermes' config and state, `~/.ssh`, the host cron jobs | Nextcloud logs and previews, the wiki clone (re-cloned with git), Hermes runtimes and caches, Redis (cache only) |
 | Ad-Blocker | ~5 MB: AdGuard config, stats and sessions, the dashboard allowlist, `/etc/letsencrypt`, `~/.ssh` | The query log (780 MB) and filter lists (re-downloaded) |
 
+Both also keep the Wazuh agent's identity and config (`client.keys`, `ossec.conf`, `local_internal_options.conf`), so a rebuilt server comes back as the same agent.
+
 The full lists are [`sandeepcloud.include`](sandeepcloud.include), [`sandeepcloud.exclude`](sandeepcloud.exclude) and [`adblocker.include`](adblocker.include).
 
 MariaDB goes in as a logical dump, not live data files. The dump already exists: `nextcloud-db-dump.sh` runs at 05:30 UTC and keeps 7 days in `/var/backups/nextcloud` (copied in [`../sandeepcloud/`](../sandeepcloud/)). The backup runs at 06:15 UTC, and a pre-backup check stops it if no dump is newer than 26 hours.
@@ -91,7 +93,7 @@ sudo restic-target r2 restore latest --host sandeepcloud --target /             
 gunzip -c /var/backups/nextcloud/nextcloud-<DATE>.sql.gz | docker exec -i sandeepcloud_db_1 sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot'
 ```
 
-The full rebuild order (Terraform, cloud-init, restore, DNS) goes in `docs/RUNBOOK-migrate.md`.
+For a whole new server, [`../provision/restore.sh`](../provision/README.md) does all of this in order. The full rebuild order (Terraform, cloud-init, restore, DNS) goes in `docs/RUNBOOK-migrate.md`.
 
 ## 🧭 Choices and limits
 

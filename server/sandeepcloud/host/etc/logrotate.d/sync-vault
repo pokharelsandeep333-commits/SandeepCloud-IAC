@@ -1,0 +1,9 @@
+/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/sync-vault.log {
+    weekly
+    rotate 4
+    compress
+    missingok
+    notifempty
+    copytruncate
+    su ubuntu ubuntu
+}

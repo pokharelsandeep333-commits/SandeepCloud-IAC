@@ -30,3 +30,8 @@
 /etc/cron.d/nextcloud-db-dump
 /var/spool/cron/crontabs/ubuntu
 /etc/logrotate.d/sandeepcloud-nginx
+
+# Wazuh agent: its identity (a rebuilt server keeps the same agent ID) and its custom config
+/var/ossec/etc/client.keys
+/var/ossec/etc/ossec.conf
+/var/ossec/etc/local_internal_options.conf
