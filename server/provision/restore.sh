@@ -195,4 +195,5 @@ Restore of $host done. Left by hand (docs/RUNBOOK-migrate.md):
 EOF
 if [ "$host" = sandeepcloud ]; then
   echo "  - Nextcloud: docker exec -u www-data sandeepcloud_nextcloud_1 php occ files:scan --all"
+  echo "  - No public IP (homelab VM)? Connect the Cloudflare Tunnel: $repo/server/provision/tunnel-up.sh"
 fi

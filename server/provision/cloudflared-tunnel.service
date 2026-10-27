@@ -1,0 +1,37 @@
+# SandeepCloud's Cloudflare Tunnel (remotely managed: the routes live in envs/cloudflare).
+# bootstrap.sh installs it off; tunnel-up.sh writes the token and starts it.
+#
+# The token reaches cloudflared as a systemd credential: a copy only this service can
+# read, so it's never on a command line, in the environment or in the unit file.
+[Unit]
+Description=Cloudflare Tunnel for SandeepCloud
+Documentation=https://developers.cloudflare.com/tunnel/
+After=network-online.target docker.service
+Wants=network-online.target
+ConditionPathExists=/etc/cloudflared/token
+
+[Service]
+Type=simple
+LoadCredential=token:/etc/cloudflared/token
+# No path: systemd finds cloudflared in /usr/bin or /usr/local/bin. Updates come from apt.
+ExecStart=cloudflared tunnel --no-autoupdate run --token-file /run/credentials/cloudflared-tunnel.service/token
+Restart=on-failure
+RestartSec=5
+
+# It only needs to make outbound connections and reach nginx on localhost
+DynamicUser=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

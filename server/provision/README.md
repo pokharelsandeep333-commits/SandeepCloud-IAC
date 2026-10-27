@@ -4,8 +4,9 @@ Builds a server from nothing on any cloud that ships an Ubuntu 24.04 or 26.04 im
 
 | Stage | Who runs it | Holds secrets? | Does |
 |---|---|---|---|
-| [`cloud-init.yaml.tftpl`](cloud-init.yaml.tftpl) → [`bootstrap.sh`](bootstrap.sh) | The cloud, on first boot | **No** | User `ubuntu` (uid 1000), packages, Docker, Tailscale, the Wazuh agent (4.14.8, held, off), restic and the backup units, and the host hardening from [`../sandeepcloud/host/`](../sandeepcloud/host/) or [`../adblocker/host/`](../adblocker/host/) |
+| [`cloud-init.yaml.tftpl`](cloud-init.yaml.tftpl) → [`bootstrap.sh`](bootstrap.sh) | The cloud, on first boot | **No** | User `ubuntu` (uid 1000), packages, Docker, Tailscale, the Wazuh agent (4.14.8, held, off), restic and the backup units, `cloudflared` and its unit on SandeepCloud (off), and the host hardening from [`../sandeepcloud/host/`](../sandeepcloud/host/) or [`../adblocker/host/`](../adblocker/host/) |
 | [`restore.sh`](restore.sh) | Sandeep, by hand, as root | Typed in at run time | Joins Tailscale, restores the backup, starts the apps, turns on the Wazuh agent and the backup timers |
+| [`tunnel-up.sh`](tunnel-up.sh) | Sandeep, by hand, as root, only on a host with no public IP | Typed in at run time | Stores the Cloudflare Tunnel token root-only and starts [`cloudflared-tunnel.service`](cloudflared-tunnel.service), which reads it as a systemd credential |
 
 User data ends up in Terraform state and can be read from inside the VM, so the keys never go in it. `restore.sh` gets them from three places: `/etc/restic/r2.env` and `/etc/restic/password` (filled in with `nano`, same as a first backup setup), and a Tailscale auth key it asks for and passes to `tailscale up` through a file in `/run`.
 
@@ -27,6 +28,7 @@ user_data = templatefile("${path.root}/../../server/provision/cloud-init.yaml.tf
 | Azure | `azurerm_linux_virtual_machine.custom_data`, wrapped in `base64encode()` | 64 KB limit. Set `admin_username = "ubuntu"`. Changing it rebuilds the VM, so `ignore_changes` |
 | GCP | `metadata.user-data` | |
 | Oracle | `metadata.user_data`, wrapped in `base64encode()` | Oracle's Ubuntu images add their own iptables rules; check 80/443 on the first drill |
+| Homelab (Hyper-V) | A NoCloud seed disk, built by [`../homelab/hyperv/New-SandeepCloudVM.ps1`](../homelab/hyperv/) | No Terraform: the script fills in the same three variables. No public IP, so the sites go through a Cloudflare Tunnel (`tunnel-up.sh`) |
 
 Every one of them needs the same `ignore_changes = [user_data]` (or its equivalent) as the AWS module, because cloud-init only reads the file on first boot.
 
@@ -61,6 +63,7 @@ Every one of them needs the same `ignore_changes = [user_data]` (or its equivale
 
 - **Only tested by reading so far.** The first real run is the fire drill (Phase 6). Expect fixes there.
 - **The repo is cloned at `repo_ref`.** Pin a commit SHA in Terraform, so a rebuild next month runs the same scripts as the drill did.
-- **Package versions float** (Docker, Tailscale, nginx come from the Ubuntu and vendor repos). Only the Wazuh agent is pinned, because it must match the manager. The apt signing keys are pinned by fingerprint.
+- **Package versions float** (Docker, Tailscale, nginx, cloudflared come from the Ubuntu and vendor repos). Only the Wazuh agent is pinned, because it must match the manager. The apt signing keys are pinned by fingerprint.
+- **`cloudflared` is installed on every SandeepCloud host but stays off** unless `tunnel-up.sh` runs. A host with a public IP never needs it. The token isn't in the backup, so a rebuild asks for it again.
 - **Same hardening as the live servers, not more.** SandeepCloud's CIS files (auditd rules, sudo log, sysctl, sshd, modprobe, core dumps, unattended reboot at 04:30 UTC) and the Ad-Blocker's sshd and journald drop-ins were copied as they are on 2026-10-26.
 - **Not reinstalled:** host packages that look left over on SandeepCloud (`xvfb`, browser libraries, `build-essential`, fonts) and the legacy `docker-compose` v1. Nothing in the compose files or cron jobs uses them.
