@@ -1,9 +1,20 @@
 # Copy to terraform.tfvars (gitignored) and fill in.
 zone_id = "<ZONE_ID>"
 
-# The servers' public IPs. Changing one is the DNS step of a move (docs/RUNBOOK-migrate.md).
+# How SandeepCloud is reached: "ip" (a server with a public IP) or "tunnel" (Cloudflare
+# Tunnel, for a host with no public IP). Switching replaces 4 records (README.md).
+sandeepcloud_origin = "ip"
+
+# Used when sandeepcloud_origin is "ip". Changing it is the DNS step of a move
+# (docs/RUNBOOK-migrate.md).
 sandeepcloud_ip = "<SANDEEPCLOUD_IP>"
-adblocker_ip    = "<ADBLOCKER_IP>"
+
+# Needed only when sandeepcloud_origin is "tunnel" (the tunnel belongs to the account)
+# account_id = "<ACCOUNT_ID>"
+
+# Set enable_adblocker = false before the Ad-Blocker's IP is released; that removes dns.
+enable_adblocker = true
+adblocker_ip     = "<ADBLOCKER_IP>"
 # adblocker_ttl = 60   # only around a move; 1 (Auto) otherwise
 
 dmarc_rua = "<DMARC_REPORT_MAILBOX>"
