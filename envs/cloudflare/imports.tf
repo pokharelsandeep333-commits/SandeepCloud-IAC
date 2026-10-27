@@ -29,9 +29,21 @@ locals {
 }
 
 import {
-  for_each = local.record_ids
+  for_each = { for k, id in local.record_ids : k => id if contains(keys(local.records), k) }
   to       = module.zone.cloudflare_dns_record.this[each.key]
   id       = "${var.zone_id}/${each.value}"
+}
+
+# The SandeepCloud IDs are the original A records. Switching to the tunnel replaces
+# those records, so their IDs only import while the switch says ip. dns. imports while
+# the Ad-Blocker is on.
+import {
+  for_each = {
+    for k, id in local.record_ids : k => id
+    if contains(keys(local.origin_records), k) && (var.sandeepcloud_origin == "ip" || !contains(keys(local.sandeepcloud_hosts), k))
+  }
+  to = module.zone.cloudflare_dns_record.origin[each.key]
+  id = "${var.zone_id}/${each.value}"
 }
 
 import {

@@ -1,9 +1,8 @@
 # DNS records and Email Routing rules for one Cloudflare zone.
 #
-# prevent_destroy is on everything: a deleted MX, SPF, DKIM or DMARC record breaks
-# mail, and a deleted A record takes a site offline. Changing a record's content (a
-# server's new IP) is an in-place update and isn't affected. Removing a record takes
-# a code change here first.
+# prevent_destroy is on everything except the origin records: a deleted MX, SPF, DKIM
+# or DMARC record breaks mail. Changing a record's content (a server's new IP) is an
+# in-place update and isn't affected. Removing a record takes a code change here first.
 
 resource "cloudflare_dns_record" "this" {
   for_each = var.records
@@ -19,6 +18,23 @@ resource "cloudflare_dns_record" "this" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+# The records that point at a server. They're expected to be replaced or removed:
+# switching an A record to a tunnel CNAME changes its type, which the provider can only
+# do by destroying and recreating the record, and a server that's switched off takes
+# its record with it. So no prevent_destroy here; read every -/+ or destroy on these
+# out loud instead.
+resource "cloudflare_dns_record" "origin" {
+  for_each = var.origin_records
+
+  zone_id  = var.zone_id
+  name     = each.value.name
+  type     = each.value.type
+  content  = each.value.content
+  proxied  = each.value.proxied
+  ttl      = each.value.ttl
+  priority = each.value.priority
 }
 
 # The forwarding destinations are verified account-level addresses. They're set up in

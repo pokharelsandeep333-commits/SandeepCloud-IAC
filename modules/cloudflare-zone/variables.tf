@@ -35,6 +35,34 @@ variable "records" {
   }
 }
 
+variable "origin_records" {
+  description = "DNS records that point at a server (an IP or a tunnel). Same shape as records, but without prevent_destroy, so a type change or a switched-off server can replace or remove them. Keys must not overlap with records."
+  type = map(object({
+    name     = string
+    type     = string
+    content  = string
+    proxied  = optional(bool, false)
+    ttl      = optional(number, 1)
+    priority = optional(number)
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for r in var.origin_records : contains(["A", "AAAA", "CNAME"], r.type)])
+    error_message = "Origin records point at a server, so only A, AAAA and CNAME are expected."
+  }
+
+  validation {
+    condition     = alltrue([for r in var.origin_records : r.ttl == 1 || (r.ttl >= 60 && r.ttl <= 86400)])
+    error_message = "ttl must be 1 (Auto) or 60-86400 seconds (the non-Enterprise range)."
+  }
+
+  validation {
+    condition     = length(setintersection(keys(var.origin_records), keys(var.records))) == 0
+    error_message = "A key can't be in both records and origin_records."
+  }
+}
+
 variable "email_routes" {
   description = "Email Routing rules: mail to one address on the zone is forwarded to one verified destination."
   type = map(object({

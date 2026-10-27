@@ -9,23 +9,59 @@ variable "zone_name" {
   default     = "sandeeppokharel.com.np"
 }
 
-variable "sandeepcloud_ip" {
-  description = "SandeepCloud's public IPv4. The apex, portfolio, wiki and sentry records point here (proxied). Changing it is the DNS step of a move."
+variable "sandeepcloud_origin" {
+  description = "How SandeepCloud is reached. \"ip\": A records to sandeepcloud_ip (a server with a public IP, as on AWS). \"tunnel\": a Cloudflare Tunnel and CNAME records to it (a host with no public IP, like the homelab VM). Switching replaces the apex, portfolio, wiki and sentry records."
   type        = string
+  default     = "ip"
 
   validation {
-    condition     = can(cidrhost("${var.sandeepcloud_ip}/32", 0))
-    error_message = "sandeepcloud_ip must be an IPv4 address."
+    condition     = contains(["ip", "tunnel"], var.sandeepcloud_origin)
+    error_message = "sandeepcloud_origin must be ip or tunnel."
   }
 }
 
-variable "adblocker_ip" {
-  description = "The Ad-Blocker's public IPv4. dns. points here (DNS-only). Changing it is the DNS step of a move."
+variable "sandeepcloud_ip" {
+  description = "SandeepCloud's public IPv4, used when sandeepcloud_origin is ip. The apex, portfolio, wiki and sentry records point here (proxied). Changing it is the DNS step of a move."
   type        = string
+  default     = null
 
   validation {
-    condition     = can(cidrhost("${var.adblocker_ip}/32", 0))
-    error_message = "adblocker_ip must be an IPv4 address."
+    condition     = var.sandeepcloud_origin != "ip" || can(cidrhost("${var.sandeepcloud_ip}/32", 0))
+    error_message = "sandeepcloud_ip must be an IPv4 address when sandeepcloud_origin is ip."
+  }
+}
+
+variable "account_id" {
+  description = "Cloudflare account ID, which owns the tunnel. Needed only when sandeepcloud_origin is tunnel. Set in terraform.tfvars (gitignored)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.sandeepcloud_origin != "tunnel" || can(regex("^[0-9a-f]{32}$", var.account_id))
+    error_message = "account_id must be the 32-character hex Cloudflare account ID when sandeepcloud_origin is tunnel."
+  }
+}
+
+variable "tunnel_name" {
+  description = "Name of SandeepCloud's Cloudflare Tunnel, as shown in the dashboard."
+  type        = string
+  default     = "sandeepcloud"
+}
+
+variable "enable_adblocker" {
+  description = "Whether dns. exists. Set it to false before the Ad-Blocker's IP is released: a record left pointing at a released cloud IP can be taken over by whoever gets that IP next."
+  type        = bool
+  default     = true
+}
+
+variable "adblocker_ip" {
+  description = "The Ad-Blocker's public IPv4, used when enable_adblocker is true. dns. points here (DNS-only). Changing it is the DNS step of a move."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = !var.enable_adblocker || can(cidrhost("${var.adblocker_ip}/32", 0))
+    error_message = "adblocker_ip must be an IPv4 address when enable_adblocker is true."
   }
 }
 

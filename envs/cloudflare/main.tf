@@ -1,21 +1,42 @@
-# The sandeeppokharel.com.np zone: the 6 records that point at the servers, the mail
+# The sandeeppokharel.com.np zone: the records that point at the servers, the mail
 # records for Cloudflare Email Routing, and the routing rules. Written to match what
 # exists (inventoried 2026-10-26, vault note 01 section E); the first plan should only
-# import.
+# import. SandeepCloud is reached by IP or through a tunnel (sandeepcloud_origin,
+# tunnel.tf).
 
 locals {
   zone = var.zone_name
 
-  records = {
-    # --- SandeepCloud (proxied; nginx serves the Cloudflare origin certificate) ---
-    apex      = { name = local.zone, type = "A", content = var.sandeepcloud_ip, proxied = true }
-    www       = { name = "www.${local.zone}", type = "CNAME", content = local.zone, proxied = true }
-    portfolio = { name = "portfolio.${local.zone}", type = "A", content = var.sandeepcloud_ip, proxied = true }
-    wiki      = { name = "wiki.${local.zone}", type = "A", content = var.sandeepcloud_ip, proxied = true }
-    sentry    = { name = "sentry.${local.zone}", type = "A", content = var.sandeepcloud_ip, proxied = true }
+  # --- SandeepCloud (proxied; nginx serves the Cloudflare origin certificate) ---
+  # The hostnames nginx serves. www is a CNAME to the apex, so it follows the apex
+  # either way, but the tunnel still needs a route for it.
+  sandeepcloud_hosts = {
+    apex      = local.zone
+    portfolio = "portfolio.${local.zone}"
+    wiki      = "wiki.${local.zone}"
+    sentry    = "sentry.${local.zone}"
+  }
+
+  sandeepcloud_target = var.sandeepcloud_origin == "tunnel" ? {
+    type    = "CNAME"
+    content = "${cloudflare_zero_trust_tunnel_cloudflared.sandeepcloud[0].id}.cfargotunnel.com"
+    } : {
+    type    = "A"
+    content = var.sandeepcloud_ip
+  }
+
+  # Records that point at a server: no prevent_destroy (see the module)
+  origin_records = merge(
+    { for k, host in local.sandeepcloud_hosts : k => merge(local.sandeepcloud_target, { name = host, proxied = true }) },
 
     # --- Ad-Blocker (DNS-only: DoH clients reach nginx and its Let's Encrypt cert directly) ---
-    dns = { name = "dns.${local.zone}", type = "A", content = var.adblocker_ip, ttl = var.adblocker_ttl }
+    var.enable_adblocker ? {
+      dns = { name = "dns.${local.zone}", type = "A", content = var.adblocker_ip, ttl = var.adblocker_ttl }
+    } : {},
+  )
+
+  records = {
+    www = { name = "www.${local.zone}", type = "CNAME", content = local.zone, proxied = true }
 
     # --- Cloudflare Email Routing ---
     mx_route1 = { name = local.zone, type = "MX", content = "route1.mx.cloudflare.net", priority = 28 }
@@ -48,9 +69,10 @@ locals {
 module "zone" {
   source = "../../modules/cloudflare-zone"
 
-  zone_id      = var.zone_id
-  records      = local.records
-  email_routes = var.email_routes
+  zone_id        = var.zone_id
+  records        = local.records
+  origin_records = local.origin_records
+  email_routes   = var.email_routes
 
   # Off, as it is today: mail to any other address on the zone bounces
   catch_all = {
