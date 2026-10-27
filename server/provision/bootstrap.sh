@@ -3,9 +3,10 @@
 #   bootstrap.sh sandeepcloud|adblocker
 #
 # Installs everything that needs no secret: Docker, Tailscale, the Wazuh agent, restic
-# and the backup units, nginx and certbot on the Ad-Blocker, and the host hardening
-# copied from the live servers (server/<host>/host/etc). It starts no app and joins no
-# network; restore.sh does that once the keys are typed in. Safe to re-run.
+# and the backup units, nginx and certbot on the Ad-Blocker, cloudflared on SandeepCloud
+# (off until tunnel-up.sh), and the host hardening copied from the live servers
+# (server/<host>/host/etc). It starts no app and joins no network; restore.sh does that
+# once the keys are typed in. Safe to re-run.
 set -euo pipefail
 umask 022
 
@@ -29,6 +30,8 @@ WAZUH_VERSION=4.14.8-1
 # Primary key fingerprints of the apt signing keys, checked against both live servers 2026-10-26
 TAILSCALE_FPR=2596A99EAAB33821893C0A79458CA832957F5868
 WAZUH_FPR=0DCFCA5547B19D2A6099506096B3EE5F29111145
+# Cloudflare's 2025 packaging key; its signature on the cloudflared repo checked 2026-10-27
+CLOUDFLARE_FPR=CC94B39C77AE7342A68B89628A682D308D4E5E73 # gitleaks:allow (a public key fingerprint, not a token)
 
 # shellcheck source=/dev/null
 . /etc/os-release
@@ -68,11 +71,17 @@ echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://
 keyring https://packages.wazuh.com/key/GPG-KEY-WAZUH "$WAZUH_FPR" /usr/share/keyrings/wazuh.gpg
 echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" \
   >/etc/apt/sources.list.d/wazuh.list
+# cloudflared, for a SandeepCloud host with no public IP (envs/cloudflare, sandeepcloud_origin = tunnel)
+if [ "$host" = sandeepcloud ]; then
+  keyring https://pkg.cloudflare.com/cloudflare-main.gpg "$CLOUDFLARE_FPR" /usr/share/keyrings/cloudflare-main.gpg
+  echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+    >/etc/apt/sources.list.d/cloudflared.list
+fi
 apt-get update -q
 
 packages=(docker.io docker-compose-v2 tailscale bzip2 curl git gnupg ufw)
 case "$host" in
-  sandeepcloud) packages+=(auditd audispd-plugins) ;;
+  sandeepcloud) packages+=(auditd audispd-plugins cloudflared) ;;
   adblocker) packages+=(nginx certbot) ;;
 esac
 apt-get install -y -q "${packages[@]}"
@@ -132,6 +141,9 @@ case "$host" in
     ufw --force enable >/dev/null
     # nginx's access log for the Wazuh agent (mounted into the nginx container)
     install -d -m 0750 -o root -g adm /var/log/sandeepcloud-nginx
+    # The tunnel's unit, off: it needs the token, which tunnel-up.sh asks for
+    install -m 0644 "$repo/server/provision/cloudflared-tunnel.service" /etc/systemd/system/
+    systemctl daemon-reload
     ;;
   adblocker)
     install -d -m 0755 /var/www/certbot /opt/adguardhome /opt/adguardhome/conf /opt/adguardhome/work

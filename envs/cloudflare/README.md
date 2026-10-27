@@ -36,13 +36,15 @@ For a host with no public IP, like the homelab VM: `cloudflared` on the host con
 
 Switching back to `"ip"` replaces them again and deletes the tunnel.
 
+**Switch in two applies,** so the DNS only moves once `cloudflared` is connected: first `-target` the two tunnel resources (2 to add), install the token on the host with `server/provision/tunnel-up.sh` and wait for the dashboard to show **Healthy**, then apply the rest (the 4 `-/+`). Steps in [`server/homelab/hyperv/README.md`](../../server/homelab/hyperv/README.md#switch-the-sites-to-the-tunnel).
+
 **The tunnel token is a secret and is kept out of Terraform** (no `tunnel_secret`, no token data source), so it's not in the state either. You copy it from the dashboard: **Networking → Tunnels → `sandeepcloud` → Add a replica**. The `eyJ…` string in the install command is the token. Install `cloudflared` on the host with it. Anyone with the token can run the tunnel, so treat it like the restic password.
 
 **Token permission:** creating the tunnel needs **`Account` · `Cloudflare Tunnel` · `Edit`** on top of the zone permissions. The `"ip"` setting doesn't.
 
 **`enable_adblocker = false`** removes `dns.`. Do it **before** the Ad-Blocker's IP is released: a record left pointing at a released cloud IP can be taken over by whoever gets that IP next.
 
-**Known gap, server side:** behind the tunnel, nginx sees every request coming from `127.0.0.1`, so its `set_real_ip_from` list needs `127.0.0.1` added before the switch, or logs and rate limits see one client.
+**Server side:** behind the tunnel, nginx sees requests coming from Docker's port proxy (the compose network's gateway), so `server/sandeepcloud/nginx.conf` trusts `127.0.0.1`, `::1` and `172.16.0.0/12` for `CF-Connecting-IP`. Without that, logs and the login throttle would see one client.
 
 ## First run: import (Sandeep)
 

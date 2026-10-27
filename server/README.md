@@ -9,7 +9,7 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | File | On the server at | How it got here |
 |---|---|---|
 | `sandeepcloud/docker-compose.yml` | `/home/ubuntu/sandeepcloud/` | Copied as-is |
-| `sandeepcloud/nginx.conf` | `/home/ubuntu/sandeepcloud/` (mounted into the nginx container) | Copied as-is |
+| `sandeepcloud/nginx.conf` | `/home/ubuntu/sandeepcloud/` (mounted into the nginx container) | Copied as-is, plus the Cloudflare Tunnel's trusted proxies (`127.0.0.1`, `::1`, `172.16.0.0/12`; added 2026-10-27, not on AWS) |
 | `sandeepcloud/uptime-kuma/docker-compose.yml` | `/home/ubuntu/uptime-kuma/` | Copied as-is |
 | `sandeepcloud/hermes/docker-compose.yml` | none (started with `docker run`) | Rebuilt from `docker inspect` |
 | `sandeepcloud/logrotate-sandeepcloud-nginx` | `/etc/logrotate.d/sandeepcloud-nginx` | Copied as-is |
@@ -21,6 +21,7 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | `sandeepcloud/host/etc/...` | the same path under `/etc` | Copied as-is (2026-10-26): the CIS and audit hardening, applied by `provision/bootstrap.sh` |
 | `adblocker/host/etc/...` | the same path under `/etc` | Copied as-is (2026-10-26): sshd and journald drop-ins |
 | `homelab/rest-server/docker-compose.yml` | the homelab laptop (WSL), not either server | Written new: the append-only restic target for the weekly backups. See [`backup/README.md`](backup/README.md#-the-homelab-end-rest-server) |
+| `homelab/hyperv/` | the homelab laptop (Hyper-V), not either server | Written new: SandeepCloud's temporary VM, built from the same cloud-init file as the clouds. See [`homelab/hyperv/README.md`](homelab/hyperv/README.md) |
 | `adblocker/adguardhome/docker-compose.yml` | none (started with `docker run`) | Rebuilt from `docker inspect` |
 | `adblocker/nginx/nginx.conf` | `/etc/nginx/nginx.conf` | Copied as-is (Ubuntu default + `server_tokens off`) |
 | `adblocker/nginx/conf.d/00-adguard-common.conf` | `/etc/nginx/conf.d/` | Copied as-is |
