@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+zone_id = "<ZONE_ID>"
+
+# The servers' public IPs. Changing one is the DNS step of a move (docs/RUNBOOK-migrate.md).
+sandeepcloud_ip = "<SANDEEPCLOUD_IP>"
+adblocker_ip    = "<ADBLOCKER_IP>"
+# adblocker_ttl = 60   # only around a move; 1 (Auto) otherwise
+
+dmarc_rua = "<DMARC_REPORT_MAILBOX>"
+
+# Forward rules. The keys must match imports.tf; forward_to must be a verified destination.
+email_routes = {
+  route1 = { to = "<ADDRESS_1>@sandeeppokharel.com.np", forward_to = "<YOUR_MAILBOX>" }
+  route2 = { to = "<ADDRESS_2>@sandeeppokharel.com.np", forward_to = "<YOUR_MAILBOX>" }
+}

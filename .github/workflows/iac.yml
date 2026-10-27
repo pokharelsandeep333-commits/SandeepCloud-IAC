@@ -61,12 +61,12 @@ jobs:
         id: fmt
         run: terraform fmt -check -recursive -diff
 
-      # Each root module, without a backend: CI has no AWS access and never reads state.
+      # Each root module, without a backend: CI has no AWS or Cloudflare access and never reads state.
       - name: ✅ terraform validate
         id: validate
         if: ${{ !cancelled() }}
         run: |
-          for dir in bootstrap envs/prod; do
+          for dir in bootstrap envs/prod envs/cloudflare; do
             echo "::group::$dir"
             terraform -chdir="$dir" init -backend=false -input=false
             terraform -chdir="$dir" validate
@@ -103,7 +103,7 @@ jobs:
             echo "| Check | Scope | Result |"
             echo "|---|---|---|"
             echo "| 🎨 \`terraform fmt\` | whole repo | $(icon "$FMT") |"
-            echo "| ✅ \`terraform validate\` | \`bootstrap\`, \`envs/prod\` | $(icon "$VALIDATE") |"
+            echo "| ✅ \`terraform validate\` | \`bootstrap\`, \`envs/prod\`, \`envs/cloudflare\` | $(icon "$VALIDATE") |"
             echo "| 🔍 TFLint + AWS ruleset | every module | $(icon "$TFLINT") |"
             echo
             echo "<sub>Terraform $TERRAFORM_VERSION · TFLint $TFLINT_VERSION</sub>"

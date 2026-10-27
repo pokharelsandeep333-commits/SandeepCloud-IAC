@@ -128,7 +128,9 @@ Phase 3 took the first scan's **25 findings (Checkov 16, Trivy 9)** to zero: **7
 .
 ├── 🧱 bootstrap/            S3 state bucket (local state, applied once per account)
 ├── 🌐 envs/prod/            Root module for the live account: backend, imports, both servers
+├── ☁️ envs/cloudflare/      Root module for the Cloudflare zone (DNS + Email Routing), state in R2
 ├── 🧩 modules/web-host/     One web server: instance, EIP, key pair, security group, rules, alarms
+├── 🧩 modules/cloudflare-zone/  DNS records and Email Routing rules for one zone
 ├── ⚙️ .github/workflows/    iac.yml: the CI pipeline above
 └── 🔍 .tflint.hcl           TFLint config (Terraform + AWS rulesets)
 ```
