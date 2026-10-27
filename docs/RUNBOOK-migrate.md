@@ -31,8 +31,8 @@ Each server can move alone. Run the steps once per server, or both side by side.
 
 | Server | Sites | Cloudflare record | Data restored (from R2) |
 |---|---|---|---|
-| **SandeepCloud** | `sandeeppokharel.com.np` + `www.` (Nextcloud), `portfolio.`, `wiki.`, `sentry.` (ShiftSentry) | Proxied (orange cloud). nginx uses a Cloudflare origin certificate | ~1 GB: Nextcloud files, MariaDB dump, every `.env`, origin cert, Watchtower's registry login, Uptime Kuma, Hermes, `~/.ssh`, cron jobs, Wazuh agent identity |
-| **Ad-Blocker** | `dns.sandeeppokharel.com.np` (public DoH) | Check before the move (step 0). It serves its own Let's Encrypt certificate, so it is most likely DNS-only (grey cloud) | ~5 MB: AdGuard config and stats, the dashboard allowlist, `/etc/letsencrypt`, `~/.ssh`, Wazuh agent identity |
+| **SandeepCloud** | `sandeeppokharel.com.np` + `www.` (Nextcloud), `portfolio.`, `wiki.`, `sentry.` (ShiftSentry) | 4 A records (apex, `portfolio`, `wiki`, `sentry`), **proxied**. `www` is a CNAME to the apex and follows it. SSL mode is Full (strict), so nginx must serve the Cloudflare origin certificate (expires 2041) | ~1 GB: Nextcloud files, MariaDB dump, every `.env`, origin cert, Watchtower's registry login, Uptime Kuma, Hermes, `~/.ssh`, cron jobs, Wazuh agent identity |
+| **Ad-Blocker** | `dns.sandeeppokharel.com.np` (public DoH) | 1 A record, **DNS-only** (grey cloud), TTL Auto (300 s). It serves its own Let's Encrypt certificate | ~5 MB: AdGuard config and stats, the dashboard allowlist, `/etc/letsencrypt`, `~/.ssh`, Wazuh agent identity |
 
 The full lists: [`server/backup/sandeepcloud.include`](../server/backup/sandeepcloud.include), [`server/backup/adblocker.include`](../server/backup/adblocker.include).
 
@@ -76,8 +76,11 @@ systemctl show restic-backup@r2 -p Result,ExecMainExitTimestamp
 
 ### DNS is ready to move fast
 
-- [ ] In the Cloudflare dashboard, note for each record in the table above: **its type and target, proxied or DNS-only, and TTL.** (Cloudflare DNS isn't in Terraform yet. Write the values in the build log, not in this repo.)
-- [ ] For any **DNS-only** record (most likely `dns.`), lower the TTL to 60 s **at least one old TTL before the move**, so the change reaches clients quickly. Proxied records move as soon as you save them.
+Cloudflare DNS isn't in Terraform yet, so this is done in the dashboard (**DNS → Records**). Checked 2026-10-26:
+
+- [ ] **Re-check the records** in the table above still look the same: type, target, proxied or DNS-only, TTL. If one changed, adjust step 7 to match.
+- [ ] **Lower `dns.`'s TTL** from Auto (300 s) to **1 min**, at least **5 minutes** before the move (one old TTL). It's DNS-only, so resolvers cache its address for the full TTL. The 5 proxied SandeepCloud records need nothing: Cloudflare answers with its own addresses, so a new origin IP takes effect as soon as it's saved.
+- [ ] **Leave the email records alone:** 3 MX (`route1/2/3.mx.cloudflare.net`), SPF, DKIM, DMARC and the `google-site-verification` TXT. They belong to Cloudflare Email Routing, not to either server, and don't change in a move.
 
 ### Fire drill only: pick a scratch place
 
@@ -232,10 +235,10 @@ Expect `200 application/dns-message`. The certificate check passes without `-k`,
 
 🔌 **provider-neutral, but not in code yet.** Cloudflare DNS will be a Terraform module (`modules/cloudflare-zone/`), and then this step becomes one variable and an apply. Until then, in the Cloudflare dashboard:
 
-- **SandeepCloud:** each record from step 0 that points at the old IP → the new public IP. **Keep them proxied.**
-- **Ad-Blocker:** `dns.` → the new public IP, keeping the proxy setting it had.
+- **SandeepCloud:** the 4 A records (apex, `portfolio`, `wiki`, `sentry`) → the new public IP. **Keep them proxied.** Don't touch `www` (a CNAME to the apex).
+- **Ad-Blocker:** `dns.` → the new public IP. **Keep it DNS-only**: DoH clients have to reach nginx directly, since it holds the Let's Encrypt certificate.
 
-Proxied records switch at once. A DNS-only record switches within its TTL (60 s if step 0 lowered it).
+The proxied records switch at once. `dns.` switches within its TTL (1 minute if step 0 lowered it).
 
 ## 8. Check everything
 
@@ -258,7 +261,7 @@ From the laptop, with normal DNS (no `--resolve`):
 - [ ] **Tailscale:** delete the old `sandeepcloud` / `adblocker` nodes in the admin console, then rename the new ones (`<host>-1` → `<host>`), so `ssh sandeepcloud` and `ssh adblocker` reach the new servers.
 - [ ] **Anything pinned to the old Tailscale IPs:** the homelab watcher's Uptime Kuma check, and any `~/.ssh/config` entry that uses an IP instead of the name.
 - [ ] **Homelab backups:** fill in `/etc/restic/homelab.env` on each new server, then `sudo systemctl enable --now restic-backup-homelab.timer`. The next Sunday run should end in `success`.
-- [ ] **DNS TTL:** set any TTL lowered in step 0 back to what it was.
+- [ ] **DNS TTL:** set `dns.` back to **Auto**.
 - [ ] **Old servers:** **stop** them (don't terminate) and keep them for about a week as the way back. Then decommission them as a reviewed change. On AWS, `prevent_destroy` and termination protection have to come off first, so it's its own PR and plan, with every `destroy` line read out loud. If the account is closing anyway, stopping them is enough: the account closure removes them.
 - [ ] **Wazuh's CloudTrail feed:** once the AWS account is gone, turn off the AWS module on the Wazuh manager (it reads the old trail bucket).
 - [ ] **Record the times** in the table at the top, and append the run to the build log.
