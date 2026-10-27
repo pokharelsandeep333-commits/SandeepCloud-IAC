@@ -1,0 +1,4 @@
+# Copy to backend.hcl (gitignored). The endpoint holds the Cloudflare account ID
+# (dashboard → R2 → the "S3 API" URL on the bucket's settings page).
+bucket    = "sandeepcloud-tfstate"
+endpoints = { s3 = "https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com" }
