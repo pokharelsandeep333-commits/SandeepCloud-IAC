@@ -7,6 +7,7 @@
 [![IaC checks](https://github.com/pokharelsandeep333-commits/SandeepCloud-IAC/actions/workflows/iac.yml/badge.svg?branch=main)](https://github.com/pokharelsandeep333-commits/SandeepCloud-IAC/actions/workflows/iac.yml)
 ![Terraform](https://img.shields.io/badge/Terraform-1.16-7B42BC?logo=terraform&logoColor=white)
 ![AWS provider](https://img.shields.io/badge/AWS%20provider-6.x-FF9900?logo=amazonwebservices&logoColor=white)
+![Cloudflare provider](https://img.shields.io/badge/Cloudflare%20provider-5.27-F38020?logo=cloudflare&logoColor=white)
 ![Checkov](https://img.shields.io/badge/scan-Checkov-6E40C9)
 ![Trivy](https://img.shields.io/badge/scan-Trivy-1904DA?logo=aqua&logoColor=white)
 ![gitleaks](https://img.shields.io/badge/secrets-gitleaks-E05D44)
@@ -21,9 +22,9 @@
 | | |
 |---|---|
 | 🎯 **Goal** | If the stack ever has to move, rebuild it from code in **about an hour**, not a weekend |
-| 📦 **Managed** | 58 live AWS resources: 2 EC2 servers, Elastic IPs, security groups, CloudTrail and its bucket, EBS snapshot policy, budget, alarms |
+| 📦 **Managed** | 58 live AWS resources (2 EC2 servers, Elastic IPs, security groups, CloudTrail and its bucket, EBS snapshot policy, budget, alarms), plus the Cloudflare zone: 14 DNS records and its Email Routing rules, with state in R2 |
 | 🔁 **Adopted, not rebuilt** | Every resource was brought in with `import` blocks until `terraform plan` said **`No changes.`**, then refactored into a module with `moved` blocks, still `No changes.` |
-| 🧩 **Modular** | One `web-host` module, called once per server, each with its own on/off switch |
+| 🧩 **Modular** | One `web-host` module, called once per server, each with its own on/off switch, and one `cloudflare-zone` module, where moving a server is one variable |
 | 🛡️ **Scanned** | `fmt` · `validate` · TFLint · Checkov · Trivy · gitleaks on every PR, with findings in GitHub code scanning. **Zero open findings**: every one was fixed or accepted in code with a reason |
 | 🔐 **No secrets in code** | No passwords, keys or tokens in `.tf`, tfvars, outputs or state. Personal values stay in a gitignored `terraform.tfvars` |
 
@@ -34,8 +35,9 @@ flowchart LR
     user([🌍 Internet])
     admin([🧑‍💻 Admin])
 
-    subgraph cf[☁️ Cloudflare]
+    subgraph cf[☁️ Cloudflare · zone in Terraform]
         proxy[Proxy + DNS]
+        r2[(🪣 R2<br/>restic backups + Terraform state)]
     end
 
     subgraph aws[AWS · us-east-1 · default VPC]
@@ -52,18 +54,23 @@ flowchart LR
 
     tailnet{{🔒 Tailscale}}
     wazuh[🛰️ Wazuh SIEM]
+    home[(🏠 Homelab<br/>append-only rest-server)]
 
     user -->|HTTPS| proxy -->|80/443<br/>Cloudflare ranges only| nc
     user -->|DoH 443| dns
     admin -.->|SSH, no port 22 open| tailnet -.-> sc & ab
     trail -->|read-only| wazuh
     dlm -.-> sc & ab
+    sc & ab -->|restic, nightly| r2
+    sc & ab -.->|restic, weekly, over the tailnet| home
 ```
 
 - **SandeepCloud** accepts web traffic **only from Cloudflare's published IP ranges** (30 rules: 15 ranges × ports 80 and 443).
 - **The Ad-Blocker** is public on 80/443 by design: public DNS-over-HTTPS is the product. Its dashboard is IP-locked in nginx on the host.
 - **Neither security group opens port 22.** SSH runs only over Tailscale.
 - **CloudTrail** covers every region and validates its log files. A Wazuh SIEM reads the bucket as its own read-only IAM user, managed outside this repo.
+- **Backups leave the account.** restic encrypts on each server, then copies nightly to Cloudflare R2 and weekly to an append-only rest-server on the homelab. Both are restore-tested.
+- **DNS is code too.** The Cloudflare zone lives in `envs/cloudflare`, with state in R2, so it outlives the AWS account. Pointing a site at a new server is one variable and an apply.
 
 ## 🔄 CI pipeline
 
@@ -131,6 +138,8 @@ Phase 3 took the first scan's **25 findings (Checkov 16, Trivy 9)** to zero: **7
 ├── ☁️ envs/cloudflare/      Root module for the Cloudflare zone (DNS + Email Routing), state in R2
 ├── 🧩 modules/web-host/     One web server: instance, EIP, key pair, security group, rules, alarms
 ├── 🧩 modules/cloudflare-zone/  DNS records and Email Routing rules for one zone
+├── 🖥️ server/               What runs inside the servers: compose files, host hardening, backups, cloud-init + restore
+├── 📖 docs/                 RUNBOOK-migrate.md: the move, step by step
 ├── ⚙️ .github/workflows/    iac.yml: the CI pipeline above
 └── 🔍 .tflint.hcl           TFLint config (Terraform + AWS rulesets)
 ```
@@ -141,6 +150,7 @@ Plans and applies run **locally from PowerShell**, never in CI. The step-by-step
 
 - 🧱 [`bootstrap/README.md`](bootstrap/README.md): create the state bucket (once per account)
 - 🌐 [`envs/prod/README.md`](envs/prod/README.md): init against the S3 backend, plan, apply
+- ☁️ [`envs/cloudflare/README.md`](envs/cloudflare/README.md): the zone, with its R2 backend and two scoped tokens
 
 ```powershell
 terraform init "-backend-config=backend.hcl"   # backend.hcl and terraform.tfvars are gitignored
@@ -159,11 +169,12 @@ Each server can be built alone: set `enable_sandeepcloud` or `enable_adblocker` 
 | 2 | 🔄 CI: fmt, validate, TFLint, Checkov, Trivy, gitleaks → code scanning | ✅ Done |
 | 3 | 🩹 Triage findings: 25 → 0 (7 fixed, 18 accepted with reasons); the build now fails on any new one | ✅ Done |
 | 4 | 👁️ GuardDuty + AWS Config + alerts | ⏸️ On hold |
-| 5 | 🖥️ Server layer: cloud-init, compose files, encrypted off-site backups, restore runbook | 🚧 Next |
-| 6 | 🔥 Fire drill: rebuild from zero, restore, time it, tear it down | 📋 Planned |
+| 5 | 🖥️ Server layer: compose files and host hardening, encrypted backups to R2 + homelab (restore-tested), provider-neutral cloud-init + `restore.sh`, the migration runbook, and the Cloudflare zone in Terraform (17 imported → **`No changes.`**) | 🚧 Almost done: the compute module for the new cloud is left |
+| 6 | 🔥 Fire drill: rebuild from zero, restore, time it, tear it down | 📋 Planned (by Dec 13) |
+| 7 | 🚚 The move: rebuild on another cloud, switch DNS with one variable, tear down the AWS account | 📋 Planned (by Dec 15) |
 
 ---
 
 <div align="center">
-<sub>Built by <a href="https://github.com/pokharelsandeep333-commits">Sandeep Pokharel</a> · Terraform · AWS · GitHub Actions</sub>
+<sub>Built by <a href="https://github.com/pokharelsandeep333-commits">Sandeep Pokharel</a> · Terraform · AWS · Cloudflare · GitHub Actions</sub>
 </div>
