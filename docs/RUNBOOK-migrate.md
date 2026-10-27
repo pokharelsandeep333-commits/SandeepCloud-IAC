@@ -18,7 +18,7 @@ It is provider-neutral for now. The parts that depend on the new cloud are marke
 | 4 | [Fill in the keys](#4-fill-in-the-keys) | Sandeep | new servers | 5 min | |
 | 5 | [Restore](#5-restore) | Sandeep | new servers | 10–20 min | |
 | 6 | [Test before DNS moves](#6-test-before-dns-moves) | both | laptop, tailnet | 10 min | |
-| 7 | [Move DNS](#7-move-dns) (real move only) | Sandeep | Cloudflare | 5 min | |
+| 7 | [Move DNS](#7-move-dns) (real move only) | Sandeep (Claude reviews the plan) | laptop, Terraform (`envs/cloudflare`) | 5 min | |
 | 8 | [Check everything](#8-check-everything) | both | laptop | 15 min | |
 | 9 | [Clean up](#9-clean-up) | Sandeep | Tailscale, Wazuh, old servers | 15 min | |
 | | **Total** | | | **about 1.5 h** | |
@@ -63,6 +63,7 @@ These open the backups, so the backups can't hold them. [`server/backup/README.m
 - [ ] The **R2 values** for each server's `/etc/restic/r2.env`: repository URL and the bucket-scoped token.
 - [ ] The **rest-server password** for each server's `/etc/restic/homelab.env` (only needed after the move, for the weekly homelab copy).
 - [ ] The **SSH public key** for the first login (the Terraform variable `ssh_public_key`).
+- [ ] The two **Cloudflare Terraform tokens** in `C:\Users\DSU\.secrets\`: the zone token and the R2 state token ([`envs/cloudflare/README.md`](../envs/cloudflare/README.md)).
 - [ ] Logins for the **Tailscale admin console**, the **Cloudflare dashboard** and the **Wazuh dashboard**.
 
 ### The backups are fresh
@@ -76,15 +77,15 @@ systemctl show restic-backup@r2 -p Result,ExecMainExitTimestamp
 
 ### DNS is ready to move fast
 
-Cloudflare DNS isn't in Terraform yet, so this is done in the dashboard (**DNS → Records**). Checked 2026-10-26:
+The zone is in Terraform: [`envs/cloudflare/`](../envs/cloudflare/), imported 2026-10-26, with state in R2. Every DNS step in this runbook is a value in `envs/cloudflare/terraform.tfvars`, then a plan and an apply. Run them from a **fresh PowerShell window** with the tokens loaded, as in [its README, step 4](../envs/cloudflare/README.md#4-plan-in-a-fresh-powershell-window). That means not the window used for AWS, whose `AWS_*` variables clash with the R2 keys.
 
-- [ ] **Re-check the records** in the table above still look the same: type, target, proxied or DNS-only, TTL. If one changed, adjust step 7 to match.
-- [ ] **Lower `dns.`'s TTL** from Auto (300 s) to **1 min**, at least **5 minutes** before the move (one old TTL). It's DNS-only, so resolvers cache its address for the full TTL. The 5 proxied SandeepCloud records need nothing: Cloudflare answers with its own addresses, so a new origin IP takes effect as soon as it's saved.
-- [ ] **Leave the email records alone:** 3 MX (`route1/2/3.mx.cloudflare.net`), SPF, DKIM, DMARC and the `google-site-verification` TXT. They belong to Cloudflare Email Routing, not to either server, and don't change in a move.
+- [ ] **Check for drift:** `terraform plan` → `No changes.` If it isn't, someone changed the zone in the dashboard. Bring the code back in line first, so step 7's plan shows only the move.
+- [ ] **Lower `dns.`'s TTL**, at least **5 minutes** before the move (one old TTL). In `terraform.tfvars`, set `adblocker_ttl = 60`, then plan: exactly **1 to change**, the `dns` record's `ttl` going from `1` to `60`. Apply. It's DNS-only, so resolvers cache its address for the full TTL. The 5 proxied SandeepCloud records need nothing: Cloudflare answers with its own addresses, so a new origin IP takes effect as soon as it's applied.
+- [ ] **The email records don't move:** 3 MX, SPF, DKIM, DMARC, the Google TXT and the routing rules. They're in the same Terraform, protected by `prevent_destroy`. A plan line that touches any of them during a move means something is wrong: stop and read it.
 
 ### Fire drill only: pick a scratch place
 
-Use a scratch region, resource group or project, so nothing there can touch the live servers. Cloudflare DNS isn't changed in a drill.
+Use a scratch region, resource group or project, so nothing there can touch the live servers. Cloudflare DNS isn't changed in a drill: don't touch `envs/cloudflare` at all.
 
 ## 1. Freeze the old servers (real move only)
 
@@ -233,12 +234,30 @@ Expect `200 application/dns-message`. The certificate check passes without `-k`,
 
 ## 7. Move DNS
 
-🔌 **provider-neutral, but not in code yet.** Cloudflare DNS will be a Terraform module (`modules/cloudflare-zone/`), and then this step becomes one variable and an apply. Until then, in the Cloudflare dashboard:
+One variable per server, in `envs/cloudflare/terraform.tfvars`. Moving only one server? Change only its line.
 
-- **SandeepCloud:** the 4 A records (apex, `portfolio`, `wiki`, `sentry`) → the new public IP. **Keep them proxied.** Don't touch `www` (a CNAME to the apex).
-- **Ad-Blocker:** `dns.` → the new public IP. **Keep it DNS-only**: DoH clients have to reach nginx directly, since it holds the Let's Encrypt certificate.
+```hcl
+sandeepcloud_ip = "<NEW_SANDEEPCLOUD_IP>"   # the apex, portfolio, wiki and sentry (proxied)
+adblocker_ip    = "<NEW_ADBLOCKER_IP>"      # dns. (DNS-only)
+```
 
-The proxied records switch at once. `dns.` switches within its TTL (1 minute if step 0 lowered it).
+Then, from the PowerShell window in step 0:
+
+```powershell
+terraform plan -out tfplan
+```
+
+**Read the plan before applying.** Paste it for review. It should be **in-place updates of `content` only**:
+- SandeepCloud: exactly 4 (`apex`, `portfolio`, `wiki`, `sentry`). `www` is a CNAME to the apex, so it doesn't change.
+- Ad-Blocker: exactly 1 (`dns`).
+- `Plan: 0 to add, 4 (or 1, or 5) to change, 0 to destroy.` No `-/+`, no email record, no routing rule. `prevent_destroy` refuses a replacement anyway, so a plan that tries one fails instead of running.
+
+```powershell
+terraform apply tfplan
+Remove-Item tfplan      # it holds the IPs and email addresses
+```
+
+The proxied records switch at once, and they stay proxied. `dns.` stays DNS-only (DoH clients must reach nginx and its Let's Encrypt certificate directly), and it switches within its TTL: 1 minute after step 0.
 
 ## 8. Check everything
 
@@ -261,7 +280,7 @@ From the laptop, with normal DNS (no `--resolve`):
 - [ ] **Tailscale:** delete the old `sandeepcloud` / `adblocker` nodes in the admin console, then rename the new ones (`<host>-1` → `<host>`), so `ssh sandeepcloud` and `ssh adblocker` reach the new servers.
 - [ ] **Anything pinned to the old Tailscale IPs:** the homelab watcher's Uptime Kuma check, and any `~/.ssh/config` entry that uses an IP instead of the name.
 - [ ] **Homelab backups:** fill in `/etc/restic/homelab.env` on each new server, then `sudo systemctl enable --now restic-backup-homelab.timer`. The next Sunday run should end in `success`.
-- [ ] **DNS TTL:** set `dns.` back to **Auto**.
+- [ ] **DNS TTL:** set `dns.` back to Auto. In `terraform.tfvars`, remove `adblocker_ttl` (or set it to `1`), then plan: exactly 1 to change, the `ttl` going from `60` to `1`. Apply, then `terraform plan` → `No changes.`
 - [ ] **Old servers:** **stop** them (don't terminate) and keep them for about a week as the way back. Then decommission them as a reviewed change. On AWS, `prevent_destroy` and termination protection have to come off first, so it's its own PR and plan, with every `destroy` line read out loud. If the account is closing anyway, stopping them is enough: the account closure removes them.
 - [ ] **Wazuh's CloudTrail feed:** once the AWS account is gone, turn off the AWS module on the Wazuh manager (it reads the old trail bucket).
 - [ ] **Record the times** in the table at the top, and append the run to the build log.
@@ -270,7 +289,7 @@ From the laptop, with normal DNS (no `--resolve`):
 
 Possible until people write to the new Nextcloud. After that, rolling back loses those writes.
 
-1. In Cloudflare, point the records back at the old IPs.
+1. Point DNS back: put the old IPs back in `envs/cloudflare/terraform.tfvars`, then plan (the same 4 or 1 `content` updates, in reverse) and apply. The old IPs are in the build log entry for the move and in vault note 01. In an emergency without Terraform at hand, edit the same records in the Cloudflare dashboard, then run `terraform plan` afterwards and set the variables to match.
 2. On the old SandeepCloud: `occ maintenance:mode --off`, then `docker start hermes uptime-kuma`.
 3. On both old servers: `sudo systemctl enable --now restic-backup-r2.timer restic-backup-homelab.timer`, then `sudo systemctl start wazuh-agent`.
 4. On the new servers: `sudo systemctl stop wazuh-agent` and `sudo systemctl disable --now restic-backup-r2.timer restic-backup-homelab.timer`, so they stop writing to the same agent ID and the same backup repository. Then tear them down.
@@ -295,6 +314,5 @@ The drill is also where these get tried, since a mistake there can't break a liv
 | Missing | Effect on this runbook | Tracked as |
 |---|---|---|
 | Compute module for the new cloud | Step 2 has no commands yet | Phase 5, after the provider cost check |
-| `modules/cloudflare-zone/` | Step 7 is done by hand in the dashboard | Planned layout in [`CLAUDE.md`](../CLAUDE.md) |
 | `user_data` input on `modules/web-host` | An AWS → AWS move can't hand the new server its cloud-init yet | Comes with the compute work |
 | A run on a real VM | Every step is checked only by reading | Phase 6 fire drill, due 2026-12-13 |
