@@ -9,7 +9,7 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | File | On the server at | How it got here |
 |---|---|---|
 | `sandeepcloud/docker-compose.yml` | `/home/ubuntu/sandeepcloud/` | Copied as-is |
-| `sandeepcloud/nginx.conf` | `/home/ubuntu/sandeepcloud/` (mounted into the nginx container) | Copied as-is, plus the Cloudflare Tunnel's trusted proxies (`127.0.0.1`, `::1`, `172.16.0.0/12`; added 2026-10-27, not on AWS) |
+| `sandeepcloud/nginx.conf` | `/home/ubuntu/sandeepcloud/` (mounted into the nginx container) | Copied as-is, plus the Cloudflare Tunnel's trusted proxy range (`172.16.0.0/12`, added 2026-10-27, not on AWS). `provision/restore.sh` installs this copy over the one in the backup |
 | `sandeepcloud/uptime-kuma/docker-compose.yml` | `/home/ubuntu/uptime-kuma/` | Copied as-is |
 | `sandeepcloud/hermes/docker-compose.yml` | none (started with `docker run`) | Rebuilt from `docker inspect` |
 | `sandeepcloud/logrotate-sandeepcloud-nginx` | `/etc/logrotate.d/sandeepcloud-nginx` | Copied as-is |
