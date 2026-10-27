@@ -93,6 +93,9 @@ case "$host" in
     chown ubuntu:crontab /var/spool/cron/crontabs/ubuntu
     chmod 0600 /var/spool/cron/crontabs/ubuntu
     chgrp docker /home/ubuntu/sandeepcloud
+    # The backup holds the old server's nginx.conf; the repo's copy is the same file plus the
+    # tunnel's trusted proxy range, so it goes in before nginx starts
+    install -m 0644 -o root -g root "$repo/server/sandeepcloud/nginx.conf" /home/ubuntu/sandeepcloud/nginx.conf
 
     step "Wiki clone (deploy key restored in ~/.ssh)"
     wiki=/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/LLM-Wiki

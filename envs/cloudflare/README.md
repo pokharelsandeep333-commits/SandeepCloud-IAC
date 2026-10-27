@@ -44,7 +44,7 @@ Switching back to `"ip"` replaces them again and deletes the tunnel.
 
 **`enable_adblocker = false`** removes `dns.`. Do it **before** the Ad-Blocker's IP is released: a record left pointing at a released cloud IP can be taken over by whoever gets that IP next.
 
-**Server side:** behind the tunnel, nginx sees requests coming from Docker's port proxy (the compose network's gateway), so `server/sandeepcloud/nginx.conf` trusts `127.0.0.1`, `::1` and `172.16.0.0/12` for `CF-Connecting-IP`. Without that, logs and the login throttle would see one client.
+**Server side:** behind the tunnel, nginx sees requests coming from Docker's port proxy (the compose network's gateway), so `server/sandeepcloud/nginx.conf` trusts Docker's range `172.16.0.0/12` for `CF-Connecting-IP`, and `restore.sh` installs that file over the backed-up one. Without that, logs and the login throttle would see one client. The range is trusted rather than one pinned subnet, because a pinned subnet could clash with the Hyper-V Default Switch, which picks a new 172.16-31 range at every reboot.
 
 ## First run: import (Sandeep)
 
