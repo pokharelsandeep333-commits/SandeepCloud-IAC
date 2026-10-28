@@ -131,9 +131,8 @@ case "$host" in
     docker exec sandeepcloud_db_1 sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot -e "FLUSH PRIVILEGES"'
     docker compose up -d
 
-    step "Uptime Kuma and Hermes"
+    step "Uptime Kuma"
     docker compose -f /home/ubuntu/uptime-kuma/docker-compose.yml up -d
-    docker compose -f "$repo/server/sandeepcloud/hermes/docker-compose.yml" up -d
     tailscale serve --bg --tcp=3001 tcp://localhost:3001
     ;;
 

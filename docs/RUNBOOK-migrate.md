@@ -31,7 +31,7 @@ Each server can move alone. Run the steps once per server, or both side by side.
 
 | Server | Sites | Cloudflare record | Data restored (from R2) |
 |---|---|---|---|
-| **SandeepCloud** | `sandeeppokharel.com.np` + `www.` (Nextcloud), `portfolio.`, `wiki.`, `sentry.` (ShiftSentry) | 4 A records (apex, `portfolio`, `wiki`, `sentry`), **proxied**. `www` is a CNAME to the apex and follows it. SSL mode is Full (strict), so nginx must serve the Cloudflare origin certificate (expires 2041) | ~1 GB: Nextcloud files, MariaDB dump, every `.env`, origin cert, Watchtower's registry login, Uptime Kuma, Hermes, `~/.ssh`, cron jobs, Wazuh agent identity |
+| **SandeepCloud** | `sandeeppokharel.com.np` + `www.` (Nextcloud), `portfolio.`, `wiki.`, `sentry.` (ShiftSentry) | 4 A records (apex, `portfolio`, `wiki`, `sentry`), **proxied**. `www` is a CNAME to the apex and follows it. SSL mode is Full (strict), so nginx must serve the Cloudflare origin certificate (expires 2041) | ~1 GB: Nextcloud files, MariaDB dump, every `.env`, origin cert, Watchtower's registry login, Uptime Kuma, `~/.ssh`, cron jobs, Wazuh agent identity |
 | **Ad-Blocker** | `dns.sandeeppokharel.com.np` (public DoH) | 1 A record, **DNS-only** (grey cloud), TTL Auto (300 s). It serves its own Let's Encrypt certificate | ~5 MB: AdGuard config and stats, the dashboard allowlist, `/etc/letsencrypt`, `~/.ssh`, Wazuh agent identity |
 
 The full lists: [`server/backup/sandeepcloud.include`](../server/backup/sandeepcloud.include), [`server/backup/adblocker.include`](../server/backup/adblocker.include).
@@ -97,8 +97,8 @@ Use a scratch region, resource group or project, so nothing there can touch the 
 # Nextcloud read-only from here on. This is where the downtime starts
 docker exec -u www-data sandeepcloud_nextcloud_1 php occ maintenance:mode --on
 
-# Things that shouldn't run twice: Hermes (same bots and keys), Uptime Kuma (double alerts)
-docker stop hermes uptime-kuma
+# Things that shouldn't run twice: Uptime Kuma (double alerts)
+docker stop uptime-kuma
 
 # A fresh dump, then the final backup (the dump check needs a dump newer than 26 h)
 sudo /usr/local/sbin/nextcloud-db-dump.sh
@@ -188,7 +188,7 @@ It asks for the Tailscale auth key, then works through it in order. [`server/pro
 1. Checks: bootstrap done, keys filled in, R2 answers, no containers running.
 2. Joins Tailscale as `tag:server` with Tailscale SSH. It's a **new node with a new Tailscale IP**, probably named `<host>-1` while the old node exists.
 3. Restores the files, then fixes the group owners that differ on a fresh install.
-4. **SandeepCloud:** clones the wiki, pulls the images, restores the Nextcloud volume, imports the newest MariaDB dump, starts everything (Kuma and Hermes included) and re-adds `tailscale serve` for Kuma.
+4. **SandeepCloud:** clones the wiki, pulls the images, restores the Nextcloud volume, imports the newest MariaDB dump, starts everything (Kuma included) and re-adds `tailscale serve` for Kuma.
    **Ad-Blocker:** installs the nginx config, then starts AdGuard Home.
 5. Starts the Wazuh agent with the restored identity (not with `--drill`).
 6. Turns on the backup timers (not with `--drill`).
@@ -270,7 +270,6 @@ From the laptop, with normal DNS (no `--resolve`):
 - [ ] **DoH:** a device or browser using `https://dns.sandeeppokharel.com.np/dns-query` resolves names and blocks an ad domain. The AdGuard dashboard opens from home (the restored allowlist) and shows new queries.
 - [ ] **Watchtower** is running: `docker logs sandeepcloud_watchtower --tail 20`, with no auth errors.
 - [ ] **Uptime Kuma** opens over the tailnet on port 3001, and its monitors go green.
-- [ ] **Hermes** is running: `docker logs hermes --tail 20`.
 - [ ] **Wazuh:** both agents show **Active** in the Wazuh dashboard, under their old agent IDs.
 - [ ] **Backups:** `systemctl list-timers 'restic-backup-*'` shows the R2 timer for tonight. After the first nightly run, `systemctl show restic-backup@r2 -p Result` is `success`.
 - [ ] **Ad-Blocker certificate renewal:** `sudo certbot renew --dry-run` passes. The certificate restored from the backup expires 2026-12-26, so certbot renews it from about 2026-11-26 on, through port 80 on whichever server DNS points at.
@@ -290,7 +289,7 @@ From the laptop, with normal DNS (no `--resolve`):
 Possible until people write to the new Nextcloud. After that, rolling back loses those writes.
 
 1. Point DNS back: put the old IPs back in `envs/cloudflare/terraform.tfvars`, then plan (the same 4 or 1 `content` updates, in reverse) and apply. The old IPs are in the build log entry for the move and in vault note 01. In an emergency without Terraform at hand, edit the same records in the Cloudflare dashboard, then run `terraform plan` afterwards and set the variables to match.
-2. On the old SandeepCloud: `occ maintenance:mode --off`, then `docker start hermes uptime-kuma`.
+2. On the old SandeepCloud: `occ maintenance:mode --off`, then `docker start uptime-kuma`.
 3. On both old servers: `sudo systemctl enable --now restic-backup-r2.timer restic-backup-homelab.timer`, then `sudo systemctl start wazuh-agent`.
 4. On the new servers: `sudo systemctl stop wazuh-agent` and `sudo systemctl disable --now restic-backup-r2.timer restic-backup-homelab.timer`, so they stop writing to the same agent ID and the same backup repository. Then tear them down.
 5. Delete the new Tailscale nodes.

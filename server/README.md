@@ -11,7 +11,6 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | `sandeepcloud/docker-compose.yml` | `/home/ubuntu/sandeepcloud/` | Copied as-is |
 | `sandeepcloud/nginx.conf` | `/home/ubuntu/sandeepcloud/` (mounted into the nginx container) | Copied as-is, plus the Cloudflare Tunnel's trusted proxy range (`172.16.0.0/12`, added 2026-10-27, not on AWS). `provision/restore.sh` installs this copy over the one in the backup |
 | `sandeepcloud/uptime-kuma/docker-compose.yml` | `/home/ubuntu/uptime-kuma/` | Copied as-is |
-| `sandeepcloud/hermes/docker-compose.yml` | none (started with `docker run`) | Rebuilt from `docker inspect` |
 | `sandeepcloud/logrotate-sandeepcloud-nginx` | `/etc/logrotate.d/sandeepcloud-nginx` | Copied as-is |
 | `sandeepcloud/nextcloud-db-dump.sh` | `/usr/local/sbin/` | Copied as-is: nightly MariaDB dump, 7 days kept |
 | `sandeepcloud/cron.d-nextcloud-db-dump` | `/etc/cron.d/nextcloud-db-dump` | Copied as-is: runs the dump at 05:30 UTC |
@@ -41,7 +40,6 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | `/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/.env` | `/etc/nginx/adguard-admin-allow.conf` (home IP) |
 | `/home/ubuntu/ShiftSentry/.env.production` | `/etc/letsencrypt/` (cert for `dns.`; can be reissued) |
 | `/home/ubuntu/sandeepcloud/watchtower/config/` (registry login) | |
-| `/home/ubuntu/.hermes/` (Hermes config and keys) | |
 | `/etc/ssl/cloudflare/origin-key.pem` + `origin.pem` (Cloudflare origin cert) | |
 | Docker volumes `sandeepcloud_data` (Nextcloud files) and `sandeepcloud_db_data` (MariaDB) | |
 | `/home/ubuntu/uptime-kuma/data/` | |
