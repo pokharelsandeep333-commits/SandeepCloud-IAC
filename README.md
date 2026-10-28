@@ -38,19 +38,24 @@
 ```mermaid
 flowchart TB
     user([🌍 Visitors])
-    admin([🧑‍💻 Admin])
+    admin([🧑‍💻 Admin PC<br/>on the tailnet])
     gh([GitHub Actions]) -->|push images| hub[(Docker Hub)]
 
     subgraph cf["☁️ Cloudflare · zone in Terraform"]
-        edge["Proxy + DNS<br/>apex · www · portfolio · wiki · sentry"]
+        edge["Edge: proxy + DNS<br/>apex · www · portfolio · wiki · sentry"]
         r2[("🪣 R2<br/>restic backups + Terraform state")]
     end
 
+    tailnet{{"🔒 Tailscale tailnet<br/>WireGuard + access policy"}}
+
     subgraph laptop["💻 Homelab laptop"]
-        subgraph vm["🗄️ SandeepCloud VM · Hyper-V · Ubuntu 24.04"]
-            cfd["cloudflared"] --> nginx["nginx :443<br/>origin certificate"] --> apps["Nextcloud · MariaDB · Redis<br/>Portfolio · ShiftSentry · wiki · Uptime Kuma"]
+        subgraph vm["🗄️ SandeepCloud VM · Hyper-V · Ubuntu 24.04 · no open ports"]
+            cfd["cloudflared<br/>public door: the 5 sites"]
+            ts["tailscaled<br/>private door: Tailscale SSH, Kuma :3001"]
+            nginx["nginx :443<br/>origin certificate"]
+            apps["Nextcloud · MariaDB · Redis<br/>Portfolio · ShiftSentry · wiki · Uptime Kuma"]
             wt["Watchtower<br/>every 5 min"]
-            host["restic timers · Wazuh agent · tailscaled"]
+            jobs["restic timers · Wazuh agent"]
         end
         subgraph wsl["WSL · Docker"]
             wazuh["🛰️ Wazuh manager"]
@@ -64,22 +69,27 @@ flowchart TB
         trail[("📜 CloudTrail bucket")]
     end
 
-    tailnet{{"🔒 Tailscale"}}
-
     user -->|HTTPS| edge
+    cfd ==>|"① VM dials out once, stays open"| edge
+    edge -.->|"② each request comes back down ①"| cfd
+    cfd -->|"localhost:443"| nginx --> apps
     user -->|"DoH (dns.)"| ab
-    edge <==>|"tunnel: the VM dialed out"| cfd
+
+    admin -.->|"ssh ubuntu@sandeepcloud-1"| tailnet
+    tailnet -.-> ts
+    tailnet -.->|SSH| ab
+    ts -.->|"shell · Kuma"| apps
+
     wt -->|pull| hub
     wt -.->|recreate| apps
-    host -->|nightly| r2
+    jobs -->|nightly| r2
     ab -->|nightly| r2
-    host -.->|weekly| rest
-    host -->|alerts| wazuh
+    jobs -.->|"weekly, via tailnet"| rest
+    jobs -->|"alerts :1514, via tailnet"| wazuh
     trail -->|read-only| wazuh
-    admin -.->|SSH| tailnet -.-> host & ab
 ```
 
-- **No public IP, no open ports.** `cloudflared` on the VM dials out to Cloudflare, and visitors' requests come back down that connection to nginx on `localhost:443`.
+- **Two doors, both opened from the inside, so the VM has no open ports.** `cloudflared` is the public door: ① it dials out to Cloudflare once and keeps the connection open, ② each visitor's request comes back down that connection to nginx on `localhost:443`. `tailscaled` is the private door: Tailscale SSH and Uptime Kuma, only for devices on the tailnet.
 - **The Ad-Blocker is still on AWS**, public on 443 for DNS-over-HTTPS.
 - **Deploys didn't change:** CI pushes to Docker Hub, and Watchtower on the server pulls every 5 minutes.
 
@@ -93,8 +103,8 @@ flowchart LR
     end
     subgraph now["Now: Cloudflare Tunnel"]
         v2([Visitor]) --> e2[Cloudflare edge]
-        c2[cloudflared on the VM] ==>|"1. outbound, opened first"| e2
-        e2 -.->|"2. request comes back down"| c2
+        c2[cloudflared on the VM] ==>|"① VM dials out once, stays open"| e2
+        e2 -.->|"② each request comes back down ①"| c2
         c2 -->|localhost:443| n2[nginx on the VM]
     end
 ```
