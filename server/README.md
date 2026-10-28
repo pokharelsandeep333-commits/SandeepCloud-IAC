@@ -2,6 +2,9 @@
 
 What runs **inside** the two servers. Terraform builds the instances; these files tell a fresh instance what to run on them. Copied read-only from the live servers on 2026-10-25.
 
+> [!NOTE]
+> **Moved 2026-10-28:** SandeepCloud now runs on a Hyper-V VM on the homelab laptop, behind a Cloudflare Tunnel ([`server/homelab/hyperv`](homelab/hyperv/), `sandeepcloud_origin = "tunnel"`). It's temporary, until the next cloud provider. The AWS SandeepCloud instance is stopped and kept as the way back; the Ad-Blocker is still on AWS. AWS details here describe the stack before the move.
+
 **No secrets live here.** Anything with a password, key, token or personal IP stays on the server and goes in the encrypted backup (list below).
 
 ## 📁 Layout

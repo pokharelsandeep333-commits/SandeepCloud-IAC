@@ -28,7 +28,7 @@ Leaving these out keeps the token limited to this one zone. The personal values 
 
 ## SandeepCloud through a Cloudflare Tunnel (`sandeepcloud_origin`)
 
-For a host with no public IP, like the homelab VM: `cloudflared` on the host connects out to Cloudflare, and visitors come back in through that connection, so the host needs no open ports. `"ip"` (the default) is today's setup.
+For a host with no public IP, like the homelab VM: `cloudflared` on the host connects out to Cloudflare, and visitors come back in through that connection, so the host needs no open ports. `"ip"` is the default. **SandeepCloud has run on `"tunnel"` since 2026-10-28** (the homelab VM); the Ad-Blocker's `dns.` record is still an A record to AWS.
 
 **What switching to `"tunnel"` does:**
 - creates the tunnel `sandeepcloud` (remotely managed) with a route for each of the 5 hostnames to `https://localhost:443` on the host, plus a 404 for anything else. TLS verification stays on: `cloudflared` trusts the Cloudflare Origin CA, and the SNI follows the Host header, so nginx's origin certificate checks out;

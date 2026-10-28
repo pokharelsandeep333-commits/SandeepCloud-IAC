@@ -87,6 +87,12 @@ if [ -f /var/ossec/etc/client.keys ]; then
   chown wazuh:wazuh /var/ossec/etc/client.keys
   chmod 0640 /var/ossec/etc/client.keys
 fi
+# restic restores the parent folders' owners too: without these the agent can't enter its own
+# folders and its start times out
+if [ -d /var/ossec/etc ]; then
+  chown root:wazuh /var/ossec
+  chown wazuh:wazuh /var/ossec/etc
+fi
 
 case "$host" in
   sandeepcloud)

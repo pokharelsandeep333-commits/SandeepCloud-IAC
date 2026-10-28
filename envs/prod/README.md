@@ -2,6 +2,9 @@
 
 The root module for the current AWS account: the account baseline (CloudTrail and its bucket, DLM snapshots, EBS default encryption, the budget), SandeepCloud and the Ad-Blocker server. State lives in the bootstrap bucket with S3-native locking.
 
+> [!NOTE]
+> **Moved 2026-10-28:** SandeepCloud now runs on a Hyper-V VM on the homelab laptop, behind a Cloudflare Tunnel ([`server/homelab/hyperv`](../../server/homelab/hyperv/), `sandeepcloud_origin = "tunnel"`). It's temporary, until the next cloud provider. The AWS SandeepCloud instance is stopped and kept as the way back; the Ad-Blocker is still on AWS. AWS details here describe the stack before the move.
+
 ## Phase 1: import
 
 `imports.tf` adopts every live resource. Nothing is created, changed or destroyed. The goal is a plan that says **58 to import, 0 to add, 0 to change, 0 to destroy**, and after the apply, `No changes.`

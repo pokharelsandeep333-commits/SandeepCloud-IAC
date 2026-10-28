@@ -67,6 +67,6 @@ Then delete its Tailscale node, and set `sandeepcloud_origin` back to `"ip"` onc
 
 ## Limits
 
-- **Tested so far:** the template rendering and the seed disk, on the laptop (FAT32 `CIDATA`, no BOM, LF endings). Not run end to end yet: the image conversion and the first boot are the first real run.
+- **Run end to end on 2026-10-28:** the VM built on the first try, a `--drill` restore, then the real move (SandeepCloud has been live here since). From the home PC the VM needs `-i ~/.ssh/homelab_ed25519` until Tailscale is up; after the restore, use Tailscale SSH (the backup's `authorized_keys` replaces the cloud-init key).
 - **Home internet and power** are now SandeepCloud's uptime. That's accepted for a temporary home.
 - **Same laptop as Wazuh and the rest-server.** The VM is its own Hyper-V guest, not inside Wazuh's WSL, so a compromised web app stays in the VM.
