@@ -2,7 +2,10 @@
 
 Moves SandeepCloud and the Ad-Blocker to new servers: another cloud, another AWS account or another region. The same steps cover the **fire drill** (a rebuild next to the live servers, then torn down) and the **real move**. Where they differ, a step says so.
 
-It is provider-neutral for now. The parts that depend on the new cloud are marked **🔌 provider**, and get filled in once the destination is picked and its compute module exists.
+It covers two kinds of destination. Where they differ, a step has one note for each:
+
+- **🔌 provider:** a cloud server with a public IP. These parts get filled in once the provider is picked and its compute module exists.
+- **🏠 homelab:** the Hyper-V VM on the homelab laptop, behind the Cloudflare Tunnel ([`server/homelab/hyperv/`](../server/homelab/hyperv/README.md)). SandeepCloud has run there since 2026-10-28, the first real run of these steps.
 
 > [!IMPORTANT]
 > **First real run, 2026-10-28:** SandeepCloud moved to the homelab VM (no cloud provider, so step 2 was `server/homelab/hyperv/New-SandeepCloudVM.ps1` and step 7 the tunnel switch in `envs/cloudflare`). Restore took 2 minutes; Nextcloud was down about 10. Fixes it turned up are in `restore.sh` (#19 and the Wazuh folder owners). The 🔌 cloud steps and the Ad-Blocker's move are still untested, and the times below are still estimates.
@@ -16,14 +19,14 @@ It is provider-neutral for now. The parts that depend on the new cloud are marke
 | 2 | [Build the new servers](#2-build-the-new-servers) | Sandeep (Claude reviews the plan) | laptop, Terraform | 10 min | |
 | 3 | [Wait for cloud-init](#3-wait-for-cloud-init) | Sandeep | new servers | 5–10 min | |
 | 4 | [Fill in the keys](#4-fill-in-the-keys) | Sandeep | new servers | 5 min | |
-| 5 | [Restore](#5-restore) | Sandeep | new servers | 10–20 min | |
+| 5 | [Restore](#5-restore) | Sandeep | new servers | 10–20 min | 2 min (🏠 SandeepCloud, 2026-10-28) |
 | 6 | [Test before DNS moves](#6-test-before-dns-moves) | both | laptop, tailnet | 10 min | |
 | 7 | [Move DNS](#7-move-dns) (real move only) | Sandeep (Claude reviews the plan) | laptop, Terraform (`envs/cloudflare`) | 5 min | |
 | 8 | [Check everything](#8-check-everything) | both | laptop | 15 min | |
 | 9 | [Clean up](#9-clean-up) | Sandeep | Tailscale, Wazuh, old servers | 15 min | |
 | | **Total** | | | **about 1.5 h** | |
 
-**Downtime (real move):** Nextcloud goes read-only at step 1 and comes back at step 7, so about an hour. The other sites keep serving from the old server until DNS moves. DoH keeps working throughout.
+**Downtime (real move):** Nextcloud goes read-only at step 1 and comes back at step 7, so about an hour. The other sites keep serving from the old server until DNS moves. DoH keeps working throughout. Build, wait and drill the new server a day ahead (steps 2–6 with `--drill`), and only steps 1, 5, 7 and 8 fall inside the downtime: on 2026-10-28 that was about 10 minutes.
 
 Each server can move alone. Run the steps once per server, or both side by side.
 
@@ -46,6 +49,7 @@ The full lists: [`server/backup/sandeepcloud.include`](../server/backup/sandeepc
   - `ignore_changes` on the user data, and the provider's version of `prevent_destroy` and termination protection.
   - A static public IP.
   - A firewall: **SandeepCloud** 80/443 from Cloudflare's ranges only. **Ad-Blocker** 80/443 from anywhere. **No port 22** (see step 3 for the first login).
+- [ ] 🏠 **homelab:** the laptop is ready ([prerequisites](../server/homelab/hyperv/README.md#prerequisites-done-2026-10-27-unless-noted): Hyper-V on, WSL capped so the VM's 2 GB fits, `qemu-img` in WSL). For the tunnel, the Cloudflare token has **Cloudflare One Connector: cloudflared · Edit** (Account API Tokens), and `account_id` is in `envs/cloudflare/terraform.tfvars` ([its README](../envs/cloudflare/README.md#sandeepcloud-through-a-cloudflare-tunnel-sandeepcloud_origin)). SandeepCloud only: the Ad-Blocker's `dns.` stays DNS-only with its own certificate (step 7), so this path doesn't cover it.
 - [ ] At least the live sizes:
 
   | Server | Live (AWS) | Minimum on the new cloud |
@@ -62,7 +66,8 @@ These open the backups, so the backups can't hold them. [`server/backup/README.m
 - [ ] The **restic password** (and its offline copy).
 - [ ] The **R2 values** for each server's `/etc/restic/r2.env`: repository URL and the bucket-scoped token.
 - [ ] The **rest-server password** for each server's `/etc/restic/homelab.env` (only needed after the move, for the weekly homelab copy).
-- [ ] The **SSH public key** for the first login (the Terraform variable `ssh_public_key`).
+- [ ] The **SSH public key** for the first login (the Terraform variable `ssh_public_key`; 🏠 `-SshPublicKey`).
+- [ ] 🏠 Nothing to keep for the tunnel: its token is copied from the dashboard on the day (step 2) and lives only on the VM.
 - [ ] The two **Cloudflare Terraform tokens** in `C:\Users\DSU\.secrets\`: the zone token and the R2 state token ([`envs/cloudflare/README.md`](../envs/cloudflare/README.md)).
 - [ ] Logins for the **Tailscale admin console**, the **Cloudflare dashboard** and the **Wazuh dashboard**.
 
@@ -139,12 +144,25 @@ terraform output                # the new public IPs
 - Either server can be built alone with its `enable_*` switch.
 - **AWS → AWS** (new account or region) still needs the AWS module to take `user_data`, and a fresh `bootstrap/` state bucket in the new account first.
 
+🏠 **homelab:** no Terraform for the server. On the laptop, in an admin PowerShell:
+
+```powershell
+cd <repo>\server\homelab\hyperv
+.\New-SandeepCloudVM.ps1 -RepoRef <full commit SHA from main> -SshPublicKey "<contents of your .pub file>"
+```
+
+It prints the VM's address on the Default Switch (for example `172.27.48.5`). The VM has no public IP, so the sites reach it through the tunnel. Create the tunnel now, days ahead if you like, since it moves no DNS: the **first of the two applies** in [the Hyper-V README](../server/homelab/hyperv/README.md#switch-the-sites-to-the-tunnel) (`sandeepcloud_origin = "tunnel"`, a `-target` plan, **2 to add**). After step 3, run `tunnel-up.sh` on the VM with the token from the dashboard and wait for **Healthy**.
+
+> [!WARNING]
+> With `sandeepcloud_origin = "tunnel"` in tfvars, a plan **without** `-target` moves the 4 records to the tunnel. Until step 7, only run targeted plans in `envs/cloudflare`.
+
 ## 3. Wait for cloud-init
 
 The first login happens before Tailscale is up, so it needs one of these:
 
 - **The provider's serial console** (preferred: no firewall change), or
 - **Port 22 from your own IP only**, added for this step and removed after step 5. Tailscale SSH takes over from there.
+- 🏠 **homelab:** a jump through the laptop, the only machine that can reach the Default Switch: `ssh -J homelab -i ~/.ssh/homelab_ed25519 ubuntu@<VM address>` from the home PC. No firewall change.
 
 ```bash
 ssh ubuntu@<NEW_IP>
@@ -195,7 +213,16 @@ It asks for the Tailscale auth key, then works through it in order. [`server/pro
 
 If it stops, fix the cause and look at what it already did before running it again. The early checks refuse a server where containers are already running. For SandeepCloud, `docker compose -f /home/ubuntu/sandeepcloud/docker-compose.yml down` (without `-v`) gets back to that point.
 
-**Close port 22** now if step 3 opened it. From here on, use `ssh <host>-1` (or the new Tailscale name) over Tailscale.
+**Real restore on a server that was drilled** (how the 🏠 move ran): reset it first, so the final snapshot lands on empty volumes. Tailscale, the keys and the tunnel stay as they are.
+
+```bash
+cd /home/ubuntu/sandeepcloud && sudo docker compose down -v
+sudo docker compose -f /home/ubuntu/uptime-kuma/docker-compose.yml down -v
+sudo tailscale serve --tcp=3001 off
+sudo /home/ubuntu/SandeepCloud-IAC/server/provision/restore.sh sandeepcloud
+```
+
+**Close port 22** now if step 3 opened it. From here on, use `ssh <host>-1` (or the new Tailscale name) over Tailscale. `restore.sh` keeps the first-login key next to the restored `authorized_keys`, so step 3's way in still works as a fallback.
 
 ## 6. Test before DNS moves
 
@@ -210,7 +237,7 @@ docker exec -u www-data sandeepcloud_nextcloud_1 php occ files:scan --all
 docker ps --format 'table {{.Names}}\t{{.Status}}'      # all up, db and nextcloud healthy
 ```
 
-Its firewall lets only Cloudflare in, so test it **over the tailnet**, from the laptop, with its new Tailscale IP:
+Its firewall lets only Cloudflare in (🏠: it has no public IP at all), so test it **over the tailnet**, from the laptop, with its new Tailscale IP:
 
 ```bash
 for h in sandeeppokharel.com.np www.sandeeppokharel.com.np portfolio.sandeeppokharel.com.np wiki.sandeeppokharel.com.np sentry.sandeeppokharel.com.np; do
@@ -250,7 +277,9 @@ terraform plan -out tfplan
 **Read the plan before applying.** Paste it for review. It should be **in-place updates of `content` only**:
 - SandeepCloud: exactly 4 (`apex`, `portfolio`, `wiki`, `sentry`). `www` is a CNAME to the apex, so it doesn't change.
 - Ad-Blocker: exactly 1 (`dns`).
-- `Plan: 0 to add, 4 (or 1, or 5) to change, 0 to destroy.` No `-/+`, no email record, no routing rule. `prevent_destroy` refuses a replacement anyway, so a plan that tries one fails instead of running.
+- `Plan: 0 to add, 4 (or 1, or 5) to change, 0 to destroy.` No `-/+`, no email record, no routing rule. The server records have no `prevent_destroy` (the tunnel switch has to replace them), so a stray replacement would run: stop at any `-/+`. The email records keep `prevent_destroy`.
+
+🏠 **homelab:** there's no IP to set. This is the tunnel's **second apply**: with `sandeepcloud_origin = "tunnel"` already in tfvars and the tunnel **Healthy**, a full `terraform plan -out tfplan`. Expect **`4 to add, 0 to change, 4 to destroy`**: the apex, `portfolio`, `wiki` and `sentry` go from A records to proxied CNAMEs to `<tunnel-id>.cfargotunnel.com` (the provider can't change a record's type in place). `www` doesn't change, and nothing else may appear. Read the 4 replacements out loud, then apply.
 
 ```powershell
 terraform apply tfplan
@@ -270,17 +299,18 @@ From the laptop, with normal DNS (no `--resolve`):
 - [ ] **DoH:** a device or browser using `https://dns.sandeeppokharel.com.np/dns-query` resolves names and blocks an ad domain. The AdGuard dashboard opens from home (the restored allowlist) and shows new queries.
 - [ ] **Watchtower** is running: `docker logs sandeepcloud_watchtower --tail 20`, with no auth errors.
 - [ ] **Uptime Kuma** opens over the tailnet on port 3001, and its monitors go green.
+- [ ] 🏠 **The tunnel:** the dashboard shows `sandeepcloud` as **Healthy**, and nginx logs real visitor IPs (CF-Connecting-IP), not Docker's gateway.
 - [ ] **Wazuh:** both agents show **Active** in the Wazuh dashboard, under their old agent IDs.
 - [ ] **Backups:** `systemctl list-timers 'restic-backup-*'` shows the R2 timer for tonight. After the first nightly run, `systemctl show restic-backup@r2 -p Result` is `success`.
 - [ ] **Ad-Blocker certificate renewal:** `sudo certbot renew --dry-run` passes. The certificate restored from the backup expires 2026-12-26, so certbot renews it from about 2026-11-26 on, through port 80 on whichever server DNS points at.
 
 ## 9. Clean up
 
-- [ ] **Tailscale:** delete the old `sandeepcloud` / `adblocker` nodes in the admin console, then rename the new ones (`<host>-1` → `<host>`), so `ssh sandeepcloud` and `ssh adblocker` reach the new servers.
+- [ ] **Tailscale:** free the name first. While the old server is kept as the way back, **rename** its node (for example `<host>-aws`) instead of deleting it: a deleted node can't rejoin when that server starts again, and it has no port 22. Delete it once the old server is gone. Then rename the new node (`<host>-1` → `<host>`), so `ssh sandeepcloud` and `ssh adblocker` reach the new servers.
 - [ ] **Anything pinned to the old Tailscale IPs:** the homelab watcher's Uptime Kuma check, and any `~/.ssh/config` entry that uses an IP instead of the name.
 - [ ] **Homelab backups:** fill in `/etc/restic/homelab.env` on each new server, then `sudo systemctl enable --now restic-backup-homelab.timer`. The next Sunday run should end in `success`.
 - [ ] **DNS TTL:** set `dns.` back to Auto. In `terraform.tfvars`, remove `adblocker_ttl` (or set it to `1`), then plan: exactly 1 to change, the `ttl` going from `60` to `1`. Apply, then `terraform plan` → `No changes.`
-- [ ] **Old servers:** **stop** them (don't terminate) and keep them for about a week as the way back. Then decommission them as a reviewed change. On AWS, `prevent_destroy` and termination protection have to come off first, so it's its own PR and plan, with every `destroy` line read out loud. If the account is closing anyway, stopping them is enough: the account closure removes them.
+- [ ] **Old servers:** **stop** them (don't terminate) and keep them for at least a week as the way back, until the new server's first nightly and weekly backups have passed. Then decommission them as a reviewed change. On AWS, `prevent_destroy` and termination protection have to come off first, so it's its own PR and plan, with every `destroy` line read out loud. If the account is closing anyway, stopping them is enough: the account closure removes them.
 - [ ] **Wazuh's CloudTrail feed:** once the AWS account is gone, turn off the AWS module on the Wazuh manager (it reads the old trail bucket).
 - [ ] **Record the times** in the table at the top, and append the run to the build log.
 
@@ -288,7 +318,8 @@ From the laptop, with normal DNS (no `--resolve`):
 
 Possible until people write to the new Nextcloud. After that, rolling back loses those writes.
 
-1. Point DNS back: put the old IPs back in `envs/cloudflare/terraform.tfvars`, then plan (the same 4 or 1 `content` updates, in reverse) and apply. The old IPs are in the build log entry for the move and in vault note 01. In an emergency without Terraform at hand, edit the same records in the Cloudflare dashboard, then run `terraform plan` afterwards and set the variables to match.
+0. If the old server was stopped, start it again first (on AWS: `aws ec2 start-instances`, Sandeep). Its EIP stays, so the old IP still holds, and its renamed Tailscale node comes back with it.
+1. Point DNS back: put the old IPs back in `envs/cloudflare/terraform.tfvars`, then plan (the same 4 or 1 `content` updates, in reverse) and apply. 🏠 From the tunnel, set `sandeepcloud_origin = "ip"` with `sandeepcloud_ip` = the old IP: the plan replaces the 4 CNAMEs with A records again (**4 to add, 4 to destroy**) and **deletes the tunnel**, so going back to the VM later needs a new tunnel and token. The old IPs are in the build log entry for the move and in vault note 01. In an emergency without Terraform at hand, edit the same records in the Cloudflare dashboard, then run `terraform plan` afterwards and set the variables to match.
 2. On the old SandeepCloud: `occ maintenance:mode --off`, then `docker start uptime-kuma`.
 3. On both old servers: `sudo systemctl enable --now restic-backup-r2.timer restic-backup-homelab.timer`, then `sudo systemctl start wazuh-agent`.
 4. On the new servers: `sudo systemctl stop wazuh-agent` and `sudo systemctl disable --now restic-backup-r2.timer restic-backup-homelab.timer`, so they stop writing to the same agent ID and the same backup repository. Then tear them down.
@@ -314,4 +345,4 @@ The drill is also where these get tried, since a mistake there can't break a liv
 |---|---|---|
 | Compute module for the new cloud | Step 2 has no commands yet | Phase 5, after the provider cost check |
 | `user_data` input on `modules/web-host` | An AWS → AWS move can't hand the new server its cloud-init yet | Comes with the compute work |
-| A run on a real VM | Every step is checked only by reading | Phase 6 fire drill, due 2026-12-13 |
+| A run on a cloud server | The 🏠 path ran for real on 2026-10-28 (SandeepCloud). The 🔌 steps and the Ad-Blocker's move are checked only by reading | Phase 6 fire drill, due 2026-12-13 |
