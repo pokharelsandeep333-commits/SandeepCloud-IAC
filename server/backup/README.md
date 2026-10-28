@@ -6,7 +6,7 @@ Encrypted, off-account backups of both servers with [restic](https://restic.net)
 
 | Server | Included (net of excludes, measured 2026-10-25) | Left out |
 |---|---|---|
-| SandeepCloud | ~1 GB: Nextcloud (config, files, custom apps), the nightly MariaDB dumps, every `.env`, the Cloudflare origin cert, Watchtower's registry login, Uptime Kuma, Hermes' config and state, `~/.ssh`, the host cron jobs | Nextcloud logs and previews, the wiki clone (re-cloned with git), Hermes runtimes and caches, Redis (cache only) |
+| SandeepCloud | ~1 GB: Nextcloud (config, files, custom apps), the nightly MariaDB dumps, every `.env`, the Cloudflare origin cert, Watchtower's registry login, Uptime Kuma, `~/.ssh`, the host cron jobs | Nextcloud logs and previews, the wiki clone (re-cloned with git), Redis (cache only) |
 | Ad-Blocker | ~5 MB: AdGuard config, stats and sessions, the dashboard allowlist, `/etc/letsencrypt`, `~/.ssh` | The query log (780 MB) and filter lists (re-downloaded) |
 
 Both also keep the Wazuh agent's identity and config (`client.keys`, `ossec.conf`, `local_internal_options.conf`), so a rebuilt server comes back as the same agent.
@@ -100,6 +100,6 @@ For a whole new server, [`../provision/restore.sh`](../provision/README.md) does
 - **Retention (R2):** 7 daily, 4 weekly, 6 monthly, pruned by the server after each run. Set in `/etc/restic/backup.conf`.
 - **Homelab is append-only** (rest-server `--append-only`): a compromised server can add snapshots but can't delete old ones. Pruning there has to run on the laptop, and isn't set up yet (manual or scheduled is still open; the restic password stays off the laptop). **R2 has no such guard,** since the token can delete. The homelab copy is the one that survives a compromised server.
 - **The homelab laptop must be on** Sunday morning. If it isn't, the run fails and alerts; run `systemctl start restic-backup@homelab` once it's back.
-- **SQLite files (Uptime Kuma, Hermes, AdGuard stats) are copied while the apps run.** Usually fine, but not guaranteed consistent. The irreplaceable data (Nextcloud files and the DB dump) doesn't have this problem.
+- **SQLite files (Uptime Kuma, AdGuard stats) are copied while the apps run.** Usually fine, but not guaranteed consistent. The irreplaceable data (Nextcloud files and the DB dump) doesn't have this problem.
 - **Nextcloud isn't put in maintenance mode.** Files changed between the 05:30 dump and the 06:15 backup can disagree slightly with the DB; `occ files:scan --all` after a restore fixes that.
 - **restic's GPG signature wasn't verified** when the checksum was pinned (the signing key couldn't be fetched). The SHA-256 comes from the release's own `SHA256SUMS` on GitHub.

@@ -15,9 +15,8 @@
 # MariaDB as nightly logical dumps (about 5.6 MB each, 7 kept), not the live data files
 /var/backups/nextcloud
 
-# Uptime Kuma (4 MB) and Hermes (1.5 GB, mostly caches excluded below)
+# Uptime Kuma (4 MB)
 /home/ubuntu/uptime-kuma
-/home/ubuntu/.hermes
 
 # Cloudflare origin certificate and key
 /etc/ssl/cloudflare
