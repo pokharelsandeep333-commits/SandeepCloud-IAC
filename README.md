@@ -33,6 +33,74 @@
 
 ## 🗺️ Architecture
 
+### Now: SandeepCloud on the homelab, behind a Cloudflare Tunnel (since 2026-10-28)
+
+```mermaid
+flowchart TB
+    user([🌍 Visitors])
+    admin([🧑‍💻 Admin])
+    gh([GitHub Actions]) -->|push images| hub[(Docker Hub)]
+
+    subgraph cf["☁️ Cloudflare · zone in Terraform"]
+        edge["Proxy + DNS<br/>apex · www · portfolio · wiki · sentry"]
+        r2[("🪣 R2<br/>restic backups + Terraform state")]
+    end
+
+    subgraph laptop["💻 Homelab laptop"]
+        subgraph vm["🗄️ SandeepCloud VM · Hyper-V · Ubuntu 24.04"]
+            cfd["cloudflared"] --> nginx["nginx :443<br/>origin certificate"] --> apps["Nextcloud · MariaDB · Redis<br/>Portfolio · ShiftSentry · wiki · Uptime Kuma"]
+            wt["Watchtower<br/>every 5 min"]
+            host["restic timers · Wazuh agent · tailscaled"]
+        end
+        subgraph wsl["WSL · Docker"]
+            wazuh["🛰️ Wazuh manager"]
+            rest[("rest-server<br/>append-only")]
+        end
+    end
+
+    subgraph aws["AWS · us-east-1"]
+        ab["🚫 Ad-Blocker · t3.micro<br/>AdGuard DoH"]
+        old["SandeepCloud EC2<br/>stopped: the way back"]
+        trail[("📜 CloudTrail bucket")]
+    end
+
+    tailnet{{"🔒 Tailscale"}}
+
+    user -->|HTTPS| edge
+    user -->|"DoH (dns.)"| ab
+    edge <==>|"tunnel: the VM dialed out"| cfd
+    wt -->|pull| hub
+    wt -.->|recreate| apps
+    host -->|nightly| r2
+    ab -->|nightly| r2
+    host -.->|weekly| rest
+    host -->|alerts| wazuh
+    trail -->|read-only| wazuh
+    admin -.->|SSH| tailnet -.-> host & ab
+```
+
+- **No public IP, no open ports.** `cloudflared` on the VM dials out to Cloudflare, and visitors' requests come back down that connection to nginx on `localhost:443`.
+- **The Ad-Blocker is still on AWS**, public on 443 for DNS-over-HTTPS.
+- **Deploys didn't change:** CI pushes to Docker Hub, and Watchtower on the server pulls every 5 minutes.
+
+How the path from Cloudflare to nginx changed:
+
+```mermaid
+flowchart LR
+    subgraph before["Before: AWS"]
+        v1([Visitor]) --> e1[Cloudflare edge]
+        e1 -->|"inbound to the server's public IP<br/>security group allows Cloudflare's ranges"| n1[nginx on EC2]
+    end
+    subgraph now["Now: Cloudflare Tunnel"]
+        v2([Visitor]) --> e2[Cloudflare edge]
+        c2[cloudflared on the VM] ==>|"1. outbound, opened first"| e2
+        e2 -.->|"2. request comes back down"| c2
+        c2 -->|localhost:443| n2[nginx on the VM]
+    end
+```
+
+### Before the move: AWS
+
 ```mermaid
 flowchart LR
     user([🌍 Internet])
