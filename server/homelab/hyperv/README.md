@@ -32,9 +32,9 @@ Files live in `C:\homelab\vms\` (outside OneDrive): the cached image in `images\
    .\New-SandeepCloudVM.ps1 -RepoRef <full commit SHA from main> -SshPublicKey "<contents of your .pub file>"
    ```
    It prints the VM's address at the end, for example `172.27.48.5`.
-2. **From the home PC**, jump through the laptop and wait for cloud-init (5-10 minutes):
+2. **From the home PC**, jump through the laptop and wait for cloud-init (5-10 minutes). The home PC has no default key, so name the one that matches `-SshPublicKey`:
    ```powershell
-   ssh -J homelab ubuntu@<VM address>
+   ssh -J homelab -i ~/.ssh/homelab_ed25519 ubuntu@<VM address>
    cloud-init status --wait --long        # ends with: bootstrap: sandeepcloud ready
    ```
 3. **Restore**, as in [`server/provision/README.md`](../../provision/README.md) steps 3-5. While AWS still serves the sites, use `--drill` (no Wazuh agent, no backup timers, so nothing clashes with the live server). From then on, SSH goes over Tailscale.
@@ -67,6 +67,6 @@ Then delete its Tailscale node, and set `sandeepcloud_origin` back to `"ip"` onc
 
 ## Limits
 
-- **Run end to end on 2026-10-28:** the VM built on the first try, a `--drill` restore, then the real move (SandeepCloud has been live here since). From the home PC the VM needs `-i ~/.ssh/homelab_ed25519` until Tailscale is up; after the restore, use Tailscale SSH (the backup's `authorized_keys` replaces the cloud-init key).
+- **Run end to end on 2026-10-28:** the image conversion, the seed disk and the first boot, a `--drill` restore, then the real move (SandeepCloud has been live here since). After the restore, SSH goes over Tailscale. `restore.sh` now keeps the cloud-init key next to the backup's `authorized_keys` (on 2026-10-28 the backup's copy replaced it), so `-i ~/.ssh/homelab_ed25519` through the laptop still works as a fallback.
 - **Home internet and power** are now SandeepCloud's uptime. That's accepted for a temporary home.
 - **Same laptop as Wazuh and the rest-server.** The VM is its own Hyper-V guest, not inside Wazuh's WSL, so a compromised web app stays in the VM.

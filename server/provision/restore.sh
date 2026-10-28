@@ -74,7 +74,21 @@ tailscale ip -4
 
 # --- Files: everything but Docker volumes now; SandeepCloud's Nextcloud volume after compose create
 step "Restore files"
+# The backup holds the old server's ~/.ssh, whose authorized_keys would replace the key this
+# server was built with (cloud-init); keep a copy and merge it back in after the restore
+ak=/home/ubuntu/.ssh/authorized_keys
+ak_built="$(mktemp -p /run)"
+if [ -f "$ak" ]; then
+  cp "$ak" "$ak_built"
+fi
 restic-target r2 restore "$snap" --host "$host" --target / --exclude /var/lib/docker/volumes
+if [ -s "$ak_built" ] && [ -f "$ak" ]; then
+  awk 'NF && !seen[$0]++' "$ak" "$ak_built" >"$ak.new"
+  install -m 0600 -o ubuntu -g ubuntu "$ak.new" "$ak"
+  rm -f "$ak.new"
+  echo "authorized_keys: restored keys plus this server's own"
+fi
+rm -f "$ak_built"
 
 # restic keeps numeric owners; these groups get a different gid on a new install
 for f in /var/ossec/etc/ossec.conf /var/ossec/etc/local_internal_options.conf; do
@@ -211,6 +225,8 @@ cat <<EOF
 Restore of $host done. Left by hand (docs/RUNBOOK-migrate.md):
   - Point the Cloudflare DNS records at this server's public IP (Terraform), then check each site.
   - Tailscale: delete the old $host node, then rename this one if it came up as $host-1.
+    Keeping the old server stopped as a way back? Rename its node instead: a deleted node
+    can't rejoin when the server starts again.
   - Wazuh: check the agent shows Active on the manager.
 EOF
 if [ "$host" = sandeepcloud ]; then
