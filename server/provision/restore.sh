@@ -129,6 +129,18 @@ case "$host" in
     gunzip -c "$dump" | docker exec -i sandeepcloud_db_1 sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot'
     # The dump (--all-databases) replaced the grant tables; load them
     docker exec sandeepcloud_db_1 sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot -e "FLUSH PRIVILEGES"'
+    # That includes the image's healthcheck user, which now has the old server's password. Point
+    # it back at this container's .my-healthcheck.cnf, or MariaDB stays unhealthy. The password
+    # only goes through pipes (the image leaves quotes and backslashes out; escaped anyway).
+    docker exec -i sandeepcloud_db_1 sh -s <<'EOF'
+pw="$(sed -n 's/^password=//p' /var/lib/mysql/.my-healthcheck.cnf | sed "s/[\\\\']/\\\\&/g")"
+[ -n "$pw" ] || { echo "no password in .my-healthcheck.cnf" >&2; exit 1; }
+for h in localhost 127.0.0.1 ::1; do
+  printf "CREATE USER IF NOT EXISTS 'healthcheck'@'%s';\nALTER USER 'healthcheck'@'%s' IDENTIFIED BY '%s';\nGRANT USAGE ON *.* TO 'healthcheck'@'%s';\n" "$h" "$h" "$pw" "$h"
+done | MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb -uroot
+EOF
+    docker exec sandeepcloud_db_1 healthcheck.sh --connect --innodb_initialized ||
+      die "MariaDB's healthcheck still fails after the import"
     docker compose up -d
 
     step "Uptime Kuma"
