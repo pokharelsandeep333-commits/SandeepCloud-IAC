@@ -53,7 +53,7 @@ Every one of them needs the same `ignore_changes = [user_data]` (or its equivale
 
 1. **Checks:** bootstrap finished, the backup keys are filled in, R2 answers, and no container is running yet (it refuses to restore over a live server).
 2. **Tailscale:** `tailscale up` as `tag:server` with Tailscale SSH and `--accept-dns=false`, like the live servers. It's a new node with a new Tailscale IP. Anything that pins the old IP (the homelab watcher's Kuma check) needs updating.
-3. **Files:** `restic restore` of everything except Docker volumes. Then it fixes the owners whose group ID differs on a fresh install (`crontab`, `docker`, `wazuh`).
+3. **Files:** `restic restore` of everything except Docker volumes. Then it fixes the owners whose group ID differs on a fresh install (`crontab`, `docker`, `wazuh`), including the `/var/ossec` and `/var/ossec/etc` folders, which restic restores with the old server's numeric owners.
 4. **SandeepCloud:** puts the repo's `nginx.conf` over the backed-up one (the same file plus the tunnel's trusted proxy range). Clones the wiki with the restored deploy key. Pulls images using Watchtower's restored registry login, then `docker compose create`. Restores the Nextcloud volume into the volume Compose just made. Starts MariaDB and imports the newest dump. Then starts everything, Uptime Kuma included, and re-adds `tailscale serve` for Kuma.
 5. **Ad-Blocker:** nginx config from the repo, the certificate and dashboard allowlist from the backup. `nginx -t`, then AdGuard Home.
 6. **Wazuh agent:** starts with the restored `client.keys`, so it keeps its agent ID. Skipped with `--drill`.

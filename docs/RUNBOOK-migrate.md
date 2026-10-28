@@ -5,7 +5,7 @@ Moves SandeepCloud and the Ad-Blocker to new servers: another cloud, another AWS
 It is provider-neutral for now. The parts that depend on the new cloud are marked **🔌 provider**, and get filled in once the destination is picked and its compute module exists.
 
 > [!IMPORTANT]
-> **Not run yet.** Nothing here has run end to end. The times are estimates. The fire drill (Phase 6) is the first real run: write the measured times in the table below, and fix this file and the scripts where they turn out wrong.
+> **First real run, 2026-10-28:** SandeepCloud moved to the homelab VM (no cloud provider, so step 2 was `server/homelab/hyperv/New-SandeepCloudVM.ps1` and step 7 the tunnel switch in `envs/cloudflare`). Restore took 2 minutes; Nextcloud was down about 10. Fixes it turned up are in `restore.sh` (#19 and the Wazuh folder owners). The 🔌 cloud steps and the Ad-Blocker's move are still untested, and the times below are still estimates.
 
 ## 🧭 The whole move at a glance
 

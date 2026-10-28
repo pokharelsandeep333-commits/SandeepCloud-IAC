@@ -17,6 +17,9 @@
 
 ---
 
+> [!NOTE]
+> **Moved 2026-10-28:** SandeepCloud now runs on a Hyper-V VM on the homelab laptop, behind a Cloudflare Tunnel ([`server/homelab/hyperv`](server/homelab/hyperv/), `sandeepcloud_origin = "tunnel"`). It's temporary, until the next cloud provider. The AWS SandeepCloud instance is stopped and kept as the way back; the Ad-Blocker is still on AWS. AWS details here describe the stack before the move.
+
 ## ✨ At a glance
 
 | | |

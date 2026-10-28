@@ -2,6 +2,9 @@
 
 One public web server on EC2: the instance, an Elastic IP and its association, the key pair, a security group with its ingress and egress rules, and (optional) status-check alarms that reboot or recover the instance. `envs/prod` calls it once per server.
 
+> [!NOTE]
+> **Moved 2026-10-28:** SandeepCloud now runs on a Hyper-V VM on the homelab laptop, behind a Cloudflare Tunnel ([`server/homelab/hyperv`](../../server/homelab/hyperv/), `sandeepcloud_origin = "tunnel"`). It's temporary, until the next cloud provider. The AWS SandeepCloud instance is stopped and kept as the way back; the Ad-Blocker is still on AWS. AWS details here describe the stack before the move.
+
 ## Built in, not configurable
 
 - IMDSv2 required, encrypted gp3 root volume (3000 IOPS, 125 MB/s), termination protection on.
