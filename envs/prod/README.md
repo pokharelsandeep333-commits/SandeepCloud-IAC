@@ -3,7 +3,7 @@
 The root module for the current AWS account: the account baseline (CloudTrail and its bucket, DLM snapshots, EBS default encryption, the budget), SandeepCloud and the Ad-Blocker server. State lives in the bootstrap bucket with S3-native locking.
 
 > [!NOTE]
-> **Moved 2026-10-28:** SandeepCloud now runs on a Hyper-V VM on the homelab laptop, behind a Cloudflare Tunnel ([`server/homelab/hyperv`](../../server/homelab/hyperv/), `sandeepcloud_origin = "tunnel"`). It's temporary, until the next cloud provider. The AWS SandeepCloud instance is stopped and kept as the way back; the Ad-Blocker is still on AWS. AWS details here describe the stack before the move.
+> **Moved 2026-10-28:** SandeepCloud now runs on a Hyper-V VM on the homelab laptop, behind a Cloudflare Tunnel ([`server/homelab/hyperv`](../../server/homelab/hyperv/), `sandeepcloud_origin = "tunnel"`). It's temporary, until the next cloud provider. The AWS SandeepCloud instance is stopped; the Ad-Blocker is still on AWS. Both are being torn down ([below](#teardown-of-both-servers-2026-10)). AWS details here describe the stack before the move.
 
 ## Phase 1: import
 
@@ -13,7 +13,7 @@ Both instances have `prevent_destroy` and `ignore_changes = [ami, user_data]`. T
 
 ## Module refactor
 
-Each server is a call to [`modules/web-host`](../../modules/web-host) in `sandeepcloud.tf` and `adblocker.tf`. Each call has its own switch, `enable_sandeepcloud` / `enable_adblocker` (both default `true`), so either server can be built alone. Turning off a server that's already in state fails the plan, because the module's instance has `prevent_destroy`. That's intended.
+Each server is a call to [`modules/web-host`](../../modules/web-host) in `sandeepcloud.tf` and `adblocker.tf`. Each call has its own switch, `enable_sandeepcloud` / `enable_adblocker` (both default `true`), so either server can be built alone. Turning off a server that's already in state fails the plan, because the module's instance has `prevent_destroy`. That's intended. (Off during the [teardown](#teardown-of-both-servers-2026-10).)
 
 The `moved` blocks next to each module call carry the 46 server resources from their old flat addresses into the modules. The server import blocks were removed: they did their job, and an import block can't target a module that might be switched off. The first plan after the refactor should list 46 moves and say **`Plan: 0 to add, 0 to change, 0 to destroy.`** After the apply records the moves, the next plan says `No changes.`
 
@@ -31,6 +31,17 @@ terraform plan
 ```
 
 The last `plan` should print `No changes.`
+
+## Teardown of both servers (2026-10)
+
+SandeepCloud lives on the homelab now, and the Ad-Blocker goes dark until it's needed again. Both come back from their restic backups (R2 and the homelab). The account baseline stays until the account closes. For this, `prevent_destroy` is off in the module, and both calls set `termination_protection = false`.
+
+**Before any apply:** the Ad-Blocker's keys are in the password manager (its restic password differs from SandeepCloud's), its final backup ended in `success`, and `dns.` is gone from `envs/cloudflare` (`enable_adblocker = false` there, exactly 1 to destroy). That record has to go first: once the EIP is released, someone else can get the address while `dns.` still points at it.
+
+1. **Termination protection off.** With both `enable_*` switches still `true`, the plan is exactly **2 to change**: `disable_api_termination` `true` → `false` on both instances, in place. Nothing else. Apply. AWS refuses to terminate a protected instance, so this has to land before step 2.
+2. **Destroy.** In `terraform.tfvars`, set `enable_sandeepcloud = false` and `enable_adblocker = false`. The plan is **46 to destroy, 0 to add, 0 to change**, all under `module.sandeepcloud[0]` (36: instance, EIP, EIP association, key pair, security group, 30 ingress rules, 1 egress rule) and `module.adblocker[0]` (10: the same five, 2 ingress, 1 egress, 2 status alarms). **Nothing** outside those two modules: the trail, its bucket, DLM, EBS encryption and the budget stay. Read the list, then apply. The root volumes go with the instances (`delete_on_termination`). The DLM snapshots stay until the account closes.
+3. `terraform plan` → `No changes.`
+4. **Afterwards, in code:** put `prevent_destroy = true` back in `modules/web-host` and drop the two `termination_protection = false` lines. With both calls switched off, that changes nothing in AWS. Leave both switches `false` in `terraform.tfvars`.
 
 ## Scanner findings
 
