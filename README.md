@@ -25,7 +25,7 @@
 | | |
 |---|---|
 | 🎯 **Goal** | If the stack ever has to move, rebuild it from code in **about an hour**, not a weekend |
-| 📦 **Managed** | 58 live AWS resources (2 EC2 servers, Elastic IPs, security groups, CloudTrail and its bucket, EBS snapshot policy, budget, alarms), plus the Cloudflare zone: 14 DNS records and its Email Routing rules, with state in R2 |
+| 📦 **Managed** | 58 live AWS resources while both EC2 servers ran (Elastic IPs, security groups, CloudTrail and its bucket, EBS snapshot policy, budget, alarms); 13 since the 2026-10-29 teardown. Plus the Cloudflare zone: its DNS records, the tunnel and the Email Routing rules, with state in R2 |
 | 🔁 **Adopted, not rebuilt** | Every resource was brought in with `import` blocks until `terraform plan` said **`No changes.`**, then refactored into a module with `moved` blocks, still `No changes.` |
 | 🧩 **Modular** | One `web-host` module, called once per server, each with its own on/off switch, and one `cloudflare-zone` module, where moving a server is one variable |
 | 🛡️ **Scanned** | `fmt` · `validate` · TFLint · Checkov · Trivy · gitleaks on every PR, with findings in GitHub code scanning. **Zero open findings**: every one was fixed or accepted in code with a reason |
@@ -43,7 +43,7 @@ flowchart TB
 
     subgraph cf["☁️ Cloudflare · zone in Terraform"]
         edge["Edge: proxy + DNS<br/>apex · www · portfolio · wiki · sentry"]
-        r2[("🪣 R2<br/>restic backups + Terraform state")]
+        r2[("🪣 R2<br/>restic backups (SandeepCloud + the dark Ad-Blocker)<br/>+ Terraform state")]
     end
 
     tailnet{{"🔒 Tailscale tailnet<br/>WireGuard + access policy"}}
@@ -63,9 +63,7 @@ flowchart TB
         end
     end
 
-    subgraph aws["AWS · us-east-1"]
-        ab["🚫 Ad-Blocker · t3.micro<br/>AdGuard DoH"]
-        old["SandeepCloud EC2<br/>stopped: the way back"]
+    subgraph aws["AWS · us-east-1 · account baseline only, no servers"]
         trail[("📜 CloudTrail bucket")]
     end
 
@@ -73,24 +71,22 @@ flowchart TB
     cfd ==>|"① VM dials out once, stays open"| edge
     edge -.->|"② each request comes back down ①"| cfd
     cfd -->|"localhost:443"| nginx --> apps
-    user -->|"DoH (dns.)"| ab
 
-    admin -.->|"ssh ubuntu@sandeepcloud-1"| tailnet
+    admin -.->|"ssh sandeepcloud"| tailnet
     tailnet -.-> ts
-    tailnet -.->|SSH| ab
     ts -.->|"shell · Kuma"| apps
 
     wt -->|pull| hub
     wt -.->|recreate| apps
     jobs -->|nightly| r2
-    ab -->|nightly| r2
     jobs -.->|"weekly, via tailnet"| rest
     jobs -->|"alerts :1514, via tailnet"| wazuh
     trail -->|read-only| wazuh
 ```
 
 - **Two doors, both opened from the inside, so the VM has no open ports.** `cloudflared` is the public door: ① it dials out to Cloudflare once and keeps the connection open, ② each visitor's request comes back down that connection to nginx on `localhost:443`. `tailscaled` is the private door: Tailscale SSH and Uptime Kuma, only for devices on the tailnet.
-- **The Ad-Blocker is still on AWS**, public on 443 for DNS-over-HTTPS.
+- **Nothing serves from AWS anymore.** Both servers were torn down on 2026-10-29. Until the account closes, only the account baseline stays: CloudTrail and its bucket (Wazuh still reads it), the snapshot policy with its last 14 snapshots, and the budget.
+- **The Ad-Blocker is dark.** `dns.` is gone from the zone. Its encrypted backups in R2 and on the homelab bring it back with `restore.sh`.
 - **Deploys didn't change:** CI pushes to Docker Hub, and Watchtower on the server pulls every 5 minutes.
 
 How the path from Cloudflare to nginx changed:
@@ -109,7 +105,7 @@ flowchart LR
     end
 ```
 
-### Before the move: AWS
+### Before the move: AWS (until 2026-10-28)
 
 ```mermaid
 flowchart LR
@@ -239,7 +235,7 @@ terraform plan -out tfplan                     # read every -/+ and destroy line
 terraform apply tfplan
 ```
 
-Each server can be built alone: set `enable_sandeepcloud` or `enable_adblocker` to `false` in `terraform.tfvars`.
+Each server can be built alone: set `enable_sandeepcloud` or `enable_adblocker` to `true` in `terraform.tfvars`. Both are `false` since the teardown.
 
 ## 🧭 Roadmap
 
@@ -252,7 +248,7 @@ Each server can be built alone: set `enable_sandeepcloud` or `enable_adblocker` 
 | 4 | 👁️ GuardDuty + AWS Config + alerts | ⏸️ On hold |
 | 5 | 🖥️ Server layer: compose files and host hardening, encrypted backups to R2 + homelab (restore-tested), provider-neutral cloud-init + `restore.sh`, the migration runbook, and the Cloudflare zone in Terraform (17 imported → **`No changes.`**) | 🚧 Almost done: the compute module for the new cloud is left |
 | 6 | 🔥 Fire drill: rebuild from zero, restore, time it, tear it down | 📋 Planned (by Dec 13) |
-| 7 | 🚚 The move: rebuild on another cloud, switch DNS with one variable, tear down the AWS account | 📋 Planned (by Dec 15) |
+| 7 | 🚚 The move: rebuild on another cloud, switch DNS with one variable, tear down the AWS account | 🚧 Partly: SandeepCloud on the homelab since 2026-10-28, both AWS servers torn down 2026-10-29; the final cloud is still open |
 
 ---
 
