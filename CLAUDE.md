@@ -24,6 +24,16 @@ This folder holds the code. The project's memory (decisions, inventory, logs and
 
 The vault has its own rules (`Obsidian Vault/LLM-Wiki/CLAUDE.md`). Only edit files in the `SandeepCloud IaC` folder there, and never put secrets or machine-local paths in vault notes.
 
+**The homelab laptop's notes, for context.** SandeepCloud's VM runs on the homelab laptop, which has its own vault folder: **`../Obsidian Vault/LLM-Wiki/Raw/Files/Homelab-Wazuh_tailscale/`**. Read a note there when a task touches the laptop. They're read-only from here (see the rule above).
+
+| Note | Read it for |
+|---|---|
+| **08 Homelab Laptop - Tailscale and SSH Setup** | The master doc for the laptop: WSL/Docker, the Wazuh manager, the watcher and Uptime Kuma (§10.6), CIS hardening, current state |
+| 07 Wazuh - Triage Playbook | Handling a Wazuh alert |
+| 05 Wazuh - Build Log, Problems and Solutions / 06 Wazuh - What It Does | Wazuh history and custom rules / a plain-language overview |
+| 03 Wazuh - AWS CloudTrail Integration | How Wazuh reads this account's trail bucket (keep its name and policy working) |
+| 01 / 04 Tailscale | The tailnet design and the access policy (`tag:server`, ports 1514 and 8000) |
+
 ## Hard dates
 
 - **The AWS account is on the Free plan.** As of 2026-10-22, the credits run out around **2026-12-22** ($78.92 left, $1.26/day). The plan itself ends 2026-12-27. Either event **closes the account**. **Act by 2026-12-15**: upgrade to Paid or finish the move.
