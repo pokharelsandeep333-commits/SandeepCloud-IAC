@@ -18,7 +18,7 @@
 ---
 
 > [!NOTE]
-> **Moved 2026-10-28:** SandeepCloud now runs on a Hyper-V VM on the homelab laptop, behind a Cloudflare Tunnel ([`server/homelab/hyperv`](server/homelab/hyperv/), `sandeepcloud_origin = "tunnel"`). It's temporary, until the next cloud provider. The AWS SandeepCloud instance is stopped and kept as the way back; the Ad-Blocker is still on AWS. AWS details here describe the stack before the move.
+> **Moved 2026-10-28:** SandeepCloud now runs on a Hyper-V VM on the homelab laptop, behind a Cloudflare Tunnel ([`server/homelab/hyperv`](server/homelab/hyperv/), `sandeepcloud_origin = "tunnel"`). It's temporary, until the next cloud provider. **Both AWS servers were torn down on 2026-10-29** ([`envs/prod`](envs/prod/README.md#teardown-of-both-servers-2026-10)); the Ad-Blocker is dark until it's needed again, and comes back from its backups. AWS details here describe the stack before the teardown.
 
 ## ✨ At a glance
 
@@ -183,7 +183,7 @@ Each run writes a summary table per job to the run page.
 
 | Control | Where |
 |---|---|
-| 🧷 `prevent_destroy` + `ignore_changes = [ami, user_data]` on both servers: a new AMI can never replace a live box (`prevent_destroy` off during the 2026-10 teardown) | `modules/web-host` |
+| 🧷 `prevent_destroy` + `ignore_changes = [ami, user_data]` on both servers: a new AMI can never replace a live box | `modules/web-host` |
 | 🚪 No ingress on port 22; the module's input validation refuses it | `modules/web-host` |
 | 🔐 IMDSv2 required, encrypted gp3 root volumes, termination protection | `modules/web-host` |
 | 🛑 `allowed_account_ids`: Terraform refuses to run against any other AWS account | `providers.tf` |

@@ -2,7 +2,7 @@
 
 The SandeepCloud AWS stack as Terraform, scanned in GitHub Actions with Checkov and Trivy, plus CloudTrail, GuardDuty and AWS Config for the account. The stack is the Nextcloud/apps server and the Ad-Blocker DoH server, both in us-east-1. The goal: if the account has to change, the whole stack moves in about an hour.
 
-**Since 2026-10-28, SandeepCloud runs on a Hyper-V VM on the homelab laptop** behind a Cloudflare Tunnel (`server/homelab/hyperv/`, Tailscale name `sandeepcloud-1` until the rename). It's temporary, until the next cloud provider. The AWS SandeepCloud instance is stopped and kept as the way back; the Ad-Blocker is still on AWS.
+**Since 2026-10-28, SandeepCloud runs on a Hyper-V VM on the homelab laptop** behind a Cloudflare Tunnel (`server/homelab/hyperv/`, Tailscale name `sandeepcloud-1` until the rename). It's temporary, until the next cloud provider. **Both AWS servers were torn down on 2026-10-29** (`envs/prod` README); the Ad-Blocker is dark until it's needed again, and comes back from its restic backups.
 
 ## Context lives in the vault, not here
 

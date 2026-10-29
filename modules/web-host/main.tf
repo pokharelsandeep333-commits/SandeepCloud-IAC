@@ -46,12 +46,12 @@ resource "aws_instance" "this" {
     Name = var.instance_name
   }
 
-  # Lifecycle can't take variables, so prevent_destroy protects every server the
-  # module builds, and turning off a server that's in state fails the plan.
-  # TEARDOWN (2026-10-28): off while both AWS servers are destroyed. Put
-  # prevent_destroy = true back once both are gone (see envs/prod/README.md).
+  # Lifecycle can't take variables, so this protects every server the module
+  # builds. Turning off a server that's in state therefore fails the plan.
+  # (It was off for the 2026-10-29 teardown, see envs/prod/README.md.)
   lifecycle {
-    ignore_changes = [ami, user_data]
+    prevent_destroy = true
+    ignore_changes  = [ami, user_data]
   }
 }
 
