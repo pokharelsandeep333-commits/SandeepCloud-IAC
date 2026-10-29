@@ -102,3 +102,9 @@ variable "status_alarms" {
   type        = bool
   default     = true
 }
+
+variable "termination_protection" {
+  description = "EC2 termination protection (disable_api_termination). Turn it off, and apply that, before a destroy: AWS refuses to terminate a protected instance."
+  type        = bool
+  default     = true
+}

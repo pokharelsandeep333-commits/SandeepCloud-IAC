@@ -13,7 +13,7 @@ resource "aws_instance" "this" {
   subnet_id               = var.subnet_id
   vpc_security_group_ids  = [aws_security_group.this.id]
   key_name                = aws_key_pair.this.key_name
-  disable_api_termination = true
+  disable_api_termination = var.termination_protection
   ebs_optimized           = true
   monitoring              = false
 
@@ -46,11 +46,12 @@ resource "aws_instance" "this" {
     Name = var.instance_name
   }
 
-  # Lifecycle can't take variables, so this protects every server the module
-  # builds. Turning off a server that's in state therefore fails the plan.
+  # Lifecycle can't take variables, so prevent_destroy protects every server the
+  # module builds, and turning off a server that's in state fails the plan.
+  # TEARDOWN (2026-10-28): off while both AWS servers are destroyed. Put
+  # prevent_destroy = true back once both are gone (see envs/prod/README.md).
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [ami, user_data]
+    ignore_changes = [ami, user_data]
   }
 }
 

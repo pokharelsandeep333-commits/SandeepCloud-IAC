@@ -29,6 +29,9 @@ module "adblocker" {
   }
 
   status_alarms = true
+
+  # TEARDOWN (2026-10-28): apply this first (in place), then set the enable_ switch to false.
+  termination_protection = false
 }
 
 # The resources were flat in this folder until the module refactor (2026-10-24).

@@ -15,13 +15,13 @@ variable "region" {
 }
 
 variable "enable_sandeepcloud" {
-  description = "Build the SandeepCloud server. Setting this false while it's in state fails the plan (prevent_destroy)."
+  description = "Build the SandeepCloud server. Setting this false destroys the server: termination protection has to be off (applied) first."
   type        = bool
   default     = true
 }
 
 variable "enable_adblocker" {
-  description = "Build the Ad-Blocker server. Setting this false while it's in state fails the plan (prevent_destroy)."
+  description = "Build the Ad-Blocker server. Setting this false destroys the server: termination protection has to be off (applied) first."
   type        = bool
   default     = true
 }

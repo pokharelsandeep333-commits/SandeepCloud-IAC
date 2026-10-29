@@ -32,7 +32,7 @@ MariaDB goes in as a logical dump, not live data files. The dump already exists:
 
 These open the backups, so they can't live inside them. Keep them in your password manager:
 
-1. **The restic password**, the same for every repository. Also keep an **offline copy** (paper or USB). If it's lost, every backup is unreadable.
+1. **The restic password of each server.** SandeepCloud and the Ad-Blocker have **different** ones (checked 2026-10-28), and each opens that server's R2 and homelab repositories. Save both, and keep an **offline copy** (paper or USB). If one is lost, that server's backups are unreadable.
 2. **The R2 token:** Object Read & Write, limited to the backup bucket.
 3. **The rest-server passwords:** one login per server on the homelab (`sandeepcloud`, `adblocker`).
 
