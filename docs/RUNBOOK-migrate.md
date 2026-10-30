@@ -301,6 +301,7 @@ From the laptop, with normal DNS (no `--resolve`):
 - [ ] **Uptime Kuma** opens over the tailnet on port 3001, and its monitors go green.
 - [ ] 🏠 **The tunnel:** the dashboard shows `sandeepcloud` as **Healthy**, and nginx logs real visitor IPs (CF-Connecting-IP), not Docker's gateway.
 - [ ] **Wazuh:** both agents show **Active** in the Wazuh dashboard, under their old agent IDs.
+- [ ] **Beszel** (after step 9 reinstalls it): SandeepCloud is green, and **All Containers** lists its 9 containers with live readings.
 - [ ] **Backups:** `systemctl list-timers 'restic-backup-*'` shows the R2 timer for tonight. After the first nightly run, `systemctl show restic-backup@r2 -p Result` is `success`.
 - [ ] **Ad-Blocker certificate renewal:** `sudo certbot renew --dry-run` passes. The certificate restored from the backup expires 2026-12-26, so certbot renews it from about 2026-11-26 on, through port 80 on whichever server DNS points at.
 
@@ -308,6 +309,11 @@ From the laptop, with normal DNS (no `--resolve`):
 
 - [ ] **Tailscale:** free the name first. While the old server is kept as the way back, **rename** its node (for example `<host>-aws`) instead of deleting it: a deleted node can't rejoin when that server starts again, and it has no port 22. Delete it once the old server is gone. Then rename the new node (`<host>-1` → `<host>`), so `ssh sandeepcloud` and `ssh adblocker` reach the new servers.
 - [ ] **Anything pinned to the old Tailscale IPs:** the homelab watcher's Uptime Kuma check, and any `~/.ssh/config` entry that uses an IP instead of the name.
+- [ ] **Beszel (SandeepCloud only):** `restore.sh` doesn't install the resource agent, so reinstall it from the Homelab working folder, on the Dell, after the rename above (both scripts SSH to `sandeepcloud`):
+  1. `scripts\install-beszel-sandeepcloud.sh` pins the old Tailscale IP in its address check and in `LISTEN=`. It refuses to run on a new IP, so change both lines to the new IP first, then read the diff.
+  2. `scripts\install-beszel-sandeepcloud.ps1`, pasting the public key from the hub's **Add System** dialog (the hub's key; it doesn't change).
+  3. `scripts\enable-beszel-containers.ps1 -Target SandeepCloud` for the container stats.
+  4. In the dashboard, **edit** the SandeepCloud system's Host/IP to the new Tailscale IP, so its history stays. Don't add a second system.
 - [ ] **Homelab backups:** fill in `/etc/restic/homelab.env` on each new server, then `sudo systemctl enable --now restic-backup-homelab.timer`. The next Sunday run should end in `success`.
 - [ ] **DNS TTL:** set `dns.` back to Auto. In `terraform.tfvars`, remove `adblocker_ttl` (or set it to `1`), then plan: exactly 1 to change, the `ttl` going from `60` to `1`. Apply, then `terraform plan` → `No changes.`
 - [ ] **Old servers:** **stop** them (don't terminate) and keep them for at least a week as the way back, until the new server's first nightly and weekly backups have passed. Then decommission them as a reviewed change. On AWS, `prevent_destroy` and termination protection have to come off first, so it's its own PR and plan, with every `destroy` line read out loud. If the account is closing anyway, stopping them is enough: the account closure removes them.
@@ -345,4 +351,5 @@ The drill is also where these get tried, since a mistake there can't break a liv
 |---|---|---|
 | Compute module for the new cloud | Step 2 has no commands yet | Phase 5, after the provider cost check |
 | `user_data` input on `modules/web-host` | An AWS → AWS move can't hand the new server its cloud-init yet | Comes with the compute work |
+| The Beszel agent in `provision/` | Step 9 reinstalls it by hand, and its installer pins the old Tailscale IP | Open: read `tailscale ip -4` instead, or move the installer into `server/` |
 | A run on a cloud server | The 🏠 path ran for real on 2026-10-28 (SandeepCloud). The 🔌 steps and the Ad-Blocker's move are checked only by reading | Phase 6 fire drill, due 2026-12-13 |

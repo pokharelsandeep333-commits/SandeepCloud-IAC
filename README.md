@@ -51,14 +51,15 @@ flowchart TB
     subgraph laptop["💻 Homelab laptop"]
         subgraph vm["🗄️ SandeepCloud VM · Hyper-V · Ubuntu 24.04 · no open ports"]
             cfd["cloudflared<br/>public door: the 5 sites"]
-            ts["tailscaled<br/>private door: Tailscale SSH, Kuma :3001"]
+            ts["tailscaled<br/>private door: Tailscale SSH, Kuma :3001, Beszel :45876"]
             nginx["nginx :443<br/>origin certificate"]
             apps["Nextcloud · MariaDB · Redis<br/>Portfolio · ShiftSentry · wiki · Uptime Kuma"]
             wt["Watchtower<br/>every 5 min"]
-            jobs["restic timers · Wazuh agent"]
+            jobs["restic timers · Wazuh agent · Beszel agent"]
         end
         subgraph wsl["WSL · Docker"]
             wazuh["🛰️ Wazuh manager"]
+            beszel["📊 Beszel hub<br/>localhost:8090"]
             rest[("rest-server<br/>append-only")]
         end
     end
@@ -81,12 +82,14 @@ flowchart TB
     jobs -->|nightly| r2
     jobs -.->|"weekly, via tailnet"| rest
     jobs -->|"alerts :1514, via tailnet"| wazuh
+    beszel -.->|"polls metrics :45876, via tailnet"| jobs
     trail -->|read-only| wazuh
 ```
 
 - **Two doors, both opened from the inside, so the VM has no open ports.** `cloudflared` is the public door: ① it dials out to Cloudflare once and keeps the connection open, ② each visitor's request comes back down that connection to nginx on `localhost:443`. `tailscaled` is the private door: Tailscale SSH and Uptime Kuma, only for devices on the tailnet.
 - **Nothing serves from AWS anymore.** Both servers were torn down on 2026-10-29. Until the account closes, only the account baseline stays: CloudTrail and its bucket (Wazuh still reads it), the snapshot policy with its last 14 snapshots, and the budget.
 - **The Ad-Blocker is dark.** `dns.` is gone from the zone. Its encrypted backups in R2 and on the homelab bring it back with `restore.sh`.
+- **Resource history in Beszel (since 2026-10-29).** The hub in WSL polls the VM's agent over the tailnet; the agent sees container stats through a filtered, stats-only Docker gateway, never the Docker socket. It isn't in `server/provision/` yet, so a move reinstalls it by hand ([runbook](docs/RUNBOOK-migrate.md#9-clean-up) step 9).
 - **Deploys didn't change:** CI pushes to Docker Hub, and Watchtower on the server pulls every 5 minutes.
 
 How the path from Cloudflare to nginx changed:
