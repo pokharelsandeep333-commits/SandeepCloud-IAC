@@ -25,8 +25,8 @@ fi
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
 export DEBIAN_FRONTEND=noninteractive
 
-# The Wazuh manager is 4.14.8, and agents must not be newer than it
-WAZUH_VERSION=4.14.8-1
+# The Wazuh manager is 4.14.9, and agents must not be newer than it
+WAZUH_VERSION=4.14.9-1
 # Primary key fingerprints of the apt signing keys, checked against both live servers 2026-10-26
 TAILSCALE_FPR=2596A99EAAB33821893C0A79458CA832957F5868
 WAZUH_FPR=0DCFCA5547B19D2A6099506096B3EE5F29111145
