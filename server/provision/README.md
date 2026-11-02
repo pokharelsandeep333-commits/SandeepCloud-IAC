@@ -8,6 +8,8 @@ Builds a server from nothing on any cloud that ships an Ubuntu 24.04 or 26.04 im
 | [`restore.sh`](restore.sh) | Sandeep, by hand, as root | Typed in at run time | Joins Tailscale, restores the backup, starts the apps, turns on the Wazuh agent and the backup timers |
 | [`tunnel-up.sh`](tunnel-up.sh) | Sandeep, by hand, as root, only on a host with no public IP | Typed in at run time | Stores the Cloudflare Tunnel token root-only and starts [`cloudflared-tunnel.service`](cloudflared-tunnel.service), which reads it as a systemd credential |
 
+`bootstrap.sh` also runs [`docker-listener.sh`](docker-listener.sh), which builds `/opt/wazuh-docker-venv` with the Python Docker library ([hash-pinned](docker-listener-requirements.txt)) and points the agent's `DockerListener` at it. Without it the `docker-listener` wodle in the restored `ossec.conf` runs but sees nothing (as on the homelab VM from 2026-10-28 to 2026-11-02). An agent upgrade puts the system Python back, so **run `sudo server/provision/docker-listener.sh` after every Wazuh agent upgrade**.
+
 User data ends up in Terraform state and can be read from inside the VM, so the keys never go in it. `restore.sh` gets them from three places: `/etc/restic/r2.env` and `/etc/restic/password` (filled in with `nano`, same as a first backup setup), and a Tailscale auth key it asks for and passes to `tailscale up` through a file in `/run`.
 
 ## 🧩 How each cloud gets the file

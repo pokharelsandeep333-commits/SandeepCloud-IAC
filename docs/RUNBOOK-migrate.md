@@ -300,7 +300,7 @@ From the laptop, with normal DNS (no `--resolve`):
 - [ ] **Watchtower** is running: `docker logs sandeepcloud_watchtower --tail 20`, with no auth errors.
 - [ ] **Uptime Kuma** opens over the tailnet on port 3001, and its monitors go green.
 - [ ] 🏠 **The tunnel:** the dashboard shows `sandeepcloud` as **Healthy**, and nginx logs real visitor IPs (CF-Connecting-IP), not Docker's gateway.
-- [ ] **Wazuh:** both agents show **Active** in the Wazuh dashboard, under their old agent IDs.
+- [ ] **Wazuh:** both agents show **Active** in the Wazuh dashboard, under their old agent IDs. Container events arrive too: wait a minute after the agent starts, run `docker exec <any container> true`, and look for rule 87907 from that agent (health checks are silenced on the manager by tuning rules 100102–100113).
 - [ ] **Beszel** (after step 9 reinstalls it): SandeepCloud is green, and **All Containers** lists its 9 containers with live readings.
 - [ ] **Backups:** `systemctl list-timers 'restic-backup-*'` shows the R2 timer for tonight. After the first nightly run, `systemctl show restic-backup@r2 -p Result` is `success`.
 - [ ] **Ad-Blocker certificate renewal:** `sudo certbot renew --dry-run` passes. The certificate restored from the backup expires 2026-12-26, so certbot renews it from about 2026-11-26 on, through port 80 on whichever server DNS points at.
