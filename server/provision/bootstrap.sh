@@ -94,6 +94,8 @@ if ! dpkg-query -W -f='${Version}' wazuh-agent 2>/dev/null | grep -qx "$WAZUH_VE
 fi
 apt-mark hold wazuh-agent >/dev/null
 systemctl disable --now wazuh-agent >/dev/null 2>&1 || true
+# Python Docker library for the agent's docker-listener wodle (restored with ossec.conf)
+"$repo/server/provision/docker-listener.sh"
 
 usermod -aG docker ubuntu
 
