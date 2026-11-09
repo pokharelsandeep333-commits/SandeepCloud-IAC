@@ -11,6 +11,8 @@ sandeepcloud_ip = "<SANDEEPCLOUD_IP>"
 
 # Needed only when sandeepcloud_origin is "tunnel" (the tunnel belongs to the account)
 # account_id = "<ACCOUNT_ID>"
+# Where the tunnel health alert goes (security.tf); also needed only in tunnel mode
+# alert_email = "<YOUR_MAILBOX>"
 
 # Set enable_adblocker = false before the Ad-Blocker's IP is released; that removes dns.
 enable_adblocker = true

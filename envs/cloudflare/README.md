@@ -15,6 +15,8 @@ The root module for the Cloudflare zone `sandeeppokharel.com.np`: all 14 DNS rec
 
 Plus the 2 Email Routing forward rules and the catch-all (off, drop), and, in tunnel mode, the tunnel and its routes ([`tunnel.tf`](tunnel.tf)).
 
+Plus two protections ([`security.tf`](security.tf), added 2026-11-08): **leaked credential detection** on the zone, which the dashboard rate-limit rule "Leaked credential check" depends on (it was off, so that rule could never match), and the **tunnel health alert** below. Test the detection with Cloudflare's test password for Free plans, `CF_LEAKED_PASSWORD`, sent in a login form more than 5 times in 10 seconds: the rate-limit rule should block the 6th request.
+
 The records that point at a server (apex, `portfolio`, `wiki`, `sentry`, `dns`) have **no `prevent_destroy`**, because switching between IP and tunnel, or switching the Ad-Blocker off, has to replace or remove them. Every other record keeps it.
 
 **Moving a server is one variable:** change `sandeepcloud_ip` or `adblocker_ip` in `terraform.tfvars`, then plan and apply. For `dns.`, set `adblocker_ttl = 60` a few minutes before the move and back to `1` (Auto) afterwards ([runbook](../../docs/RUNBOOK-migrate.md) steps 0, 7 and 9).
@@ -42,6 +44,8 @@ Switching back to `"ip"` replaces them again and deletes the tunnel.
 
 **Token permission:** creating the tunnel needs **`Account` · `Cloudflare Tunnel` · `Edit`** on top of the zone permissions. The `"ip"` setting doesn't.
 
+**Tunnel health alert** ([`security.tf`](security.tf)): in tunnel mode, Cloudflare emails `alert_email` whenever the tunnel changes status (Healthy, Degraded, Down, Inactive). Uptime Kuma runs on the same VM, so it can't report the VM or the laptop going away; this can. It needs **`Account` · `Notifications` · `Edit`** on the token. Test it by stopping `cloudflared-tunnel` on the VM for a minute (the sites are down meanwhile).
+
 **`enable_adblocker = false`** removes `dns.`. Do it **before** the Ad-Blocker's IP is released: a record left pointing at a released cloud IP can be taken over by whoever gets that IP next.
 
 **Server side:** behind the tunnel, nginx sees requests coming from Docker's port proxy (the compose network's gateway), so `server/sandeepcloud/nginx.conf` trusts Docker's range `172.16.0.0/12` for `CF-Connecting-IP`, and `restore.sh` installs that file over the backed-up one. Without that, logs and the login throttle would see one client. The range is trusted rather than one pinned subnet, because a pinned subnet could clash with the Hyper-V Default Switch, which picks a new 172.16-31 range at every reboot.
@@ -68,11 +72,13 @@ Cloudflare shows the **Access Key ID** and **Secret Access Key** once. Save them
 
 ### 3. Create the DNS + Email Routing API token
 
-**My Profile** → **API Tokens** → **Create Token** → **Create Custom Token**:
+**Manage Account** → **Account API Tokens** → **Create Token** → **Create Custom Token** (the live token is an Account API token, so it's on that page, not under My Profile → API Tokens):
 - Name: `terraform-sandeeppokharel-zone`.
 - Permissions:
   - `Zone` · `DNS` · `Edit`
   - `Zone` · `Email Routing Rules` · `Edit` (the API calls it Email Routing Rules Write)
+  - `Zone` · `Zone WAF` · `Edit` (leaked credential detection, `security.tf`; added 2026-11-08)
+  - in tunnel mode also `Account` · `Cloudflare Tunnel` · `Edit` and `Account` · `Notifications` · `Edit` (see above)
 - Zone Resources: `Include` · `Specific zone` · `sandeeppokharel.com.np`.
 - Client IP filtering and TTL: optional.
 
