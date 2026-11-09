@@ -32,7 +32,9 @@ services:
 
   redis:
     <<: *hardening
-    image: redis:7-alpine
+    # 8-alpine since 2026-11-08: redis:7-alpine is still built on Alpine 3.21, which is end of life.
+    # Only Nextcloud's file-locking/memcache lives here; Redis 8 reads the Redis 7 RDB file.
+    image: redis:8-alpine
     command: redis-server --save 60 1 --loglevel warning
     mem_limit: 128m
     networks: [backend]
