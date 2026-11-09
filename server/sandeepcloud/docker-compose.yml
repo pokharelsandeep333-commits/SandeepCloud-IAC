@@ -137,7 +137,7 @@ services:
   watchtower:
     <<: *hardening
     # Maintained fork (containrrr/watchtower was archived Dec 2025). Pinned by digest.
-    image: nickfedor/watchtower:1.22.3@sha256:2f8f2a9bd21a195b3b650409532a20f6aada8ef5834f00d0d7a999dee0779a81
+    image: nickfedor/watchtower:1.24.0@sha256:e96976bcbeaf0a9adeddc9016a539c27a2245ef6bb7d3ca97ed106783350d387
     container_name: sandeepcloud_watchtower
     mem_limit: 64m
     environment:

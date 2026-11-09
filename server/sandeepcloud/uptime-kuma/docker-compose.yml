@@ -2,7 +2,10 @@
 # Reachable ONLY via Tailscale Serve (tailscale serve --bg --tcp=3001 tcp://localhost:3001); never published publicly.
 services:
   uptime-kuma:
-    image: louislam/uptime-kuma:2.5.9
+    # -slim (2026-11-08): no bundled Chromium or embedded MariaDB. Trivy found 844 fixable
+    # CRITICAL/HIGH in the full image, mostly Chromium. Safe here: SQLite DB, and no
+    # "Real Browser" monitors (only http, keyword, push). Switch back to the full tag to add one.
+    image: louislam/uptime-kuma:2.5.9-slim
     container_name: uptime-kuma
     restart: unless-stopped
     ports:
