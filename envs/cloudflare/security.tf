@@ -34,3 +34,40 @@ resource "cloudflare_notification_policy" "tunnel_health" {
     email = [{ id = var.alert_email }]
   }
 }
+
+# Three more account alerts (added 2026-11-08), all "included with all Cloudflare plans"
+# and with no required filters (docs: notifications/notification-available). Same token
+# permission as above (Account · Notifications · Edit), so they need the account ID.
+locals {
+  account_alerts = {
+    # A new Security Insights finding (it flagged the missing 2FA on 2026-11-02)
+    security_insights = {
+      alert_type = "security_insights_alert"
+      name       = "Security Insights finding"
+    }
+    # Validation, issuance, renewal or expiry notices for the edge (Universal) certificate
+    universal_ssl = {
+      alert_type = "universal_ssl_event_type"
+      name       = "Universal SSL certificate event"
+    }
+    # Cloudflare mitigated an HTTP DDoS attack above 100 requests per second
+    http_ddos = {
+      alert_type = "dos_attack_l7"
+      name       = "HTTP DDoS attack mitigated"
+    }
+  }
+}
+
+resource "cloudflare_notification_policy" "account" {
+  for_each = var.account_id == null ? {} : local.account_alerts
+
+  account_id  = var.account_id
+  name        = each.value.name
+  description = "Managed by Terraform (envs/cloudflare)."
+  alert_type  = each.value.alert_type
+  enabled     = true
+
+  mechanisms = {
+    email = [{ id = var.alert_email }]
+  }
+}

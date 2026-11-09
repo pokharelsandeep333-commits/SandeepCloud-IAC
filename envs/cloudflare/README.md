@@ -15,6 +15,8 @@ The root module for the Cloudflare zone `sandeeppokharel.com.np`: all 14 DNS rec
 
 Plus the 2 Email Routing forward rules and the catch-all (off, drop), and, in tunnel mode, the tunnel and its routes ([`tunnel.tf`](tunnel.tf)).
 
+Plus three more account alerts in the same file (Security Insights findings, Universal SSL certificate events, HTTP DDoS attacks mitigated; all free, no filters), and **Cloudflare Access on `wiki.`** ([`access.tf`](access.tf)): only the emails in `wiki_access_emails` get past Cloudflare's login, before anything reaches the tunnel. The login uses the Zero Trust organization's identity providers (Cloudflare or a one-time PIN). Token permission: **`Account` · `Access: Apps and Policies` · `Edit`**. Uptime Kuma's wiki check now sees Cloudflare's login page (it follows the redirect), so it shows Cloudflare is up, not that the wiki app is.
+
 Plus two protections ([`security.tf`](security.tf), added 2026-11-08): **leaked credential detection** on the zone, which the dashboard rate-limit rule "Leaked credential check" depends on (it was off, so that rule could never match), and the **tunnel health alert** below. Test the detection with Cloudflare's test password for Free plans, `CF_LEAKED_PASSWORD`, sent in a login form more than 5 times in 10 seconds: the rate-limit rule should block the 6th request.
 
 The records that point at a server (apex, `portfolio`, `wiki`, `sentry`, `dns`) have **no `prevent_destroy`**, because switching between IP and tunnel, or switching the Ad-Blocker off, has to replace or remove them. Every other record keeps it.

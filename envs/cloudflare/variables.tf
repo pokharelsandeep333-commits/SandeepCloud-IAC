@@ -37,19 +37,30 @@ variable "account_id" {
   default     = null
 
   validation {
-    condition     = var.sandeepcloud_origin != "tunnel" || can(regex("^[0-9a-f]{32}$", var.account_id))
+    condition     = var.account_id == null || can(regex("^[0-9a-f]{32}$", var.account_id))
     error_message = "account_id must be the 32-character hex Cloudflare account ID when sandeepcloud_origin is tunnel."
   }
 }
 
 variable "alert_email" {
-  description = "Where the tunnel health alert (security.tf) is sent. Needed only when sandeepcloud_origin is tunnel. Set in terraform.tfvars (gitignored)."
+  description = "Where the account alerts (security.tf) are sent. Needed when account_id is set. Set in terraform.tfvars (gitignored)."
   type        = string
   default     = null
 
   validation {
     condition     = var.sandeepcloud_origin != "tunnel" || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
-    error_message = "alert_email must be an email address when sandeepcloud_origin is tunnel."
+    error_message = "alert_email must be an email address when account_id is set."
+  }
+}
+
+variable "wiki_access_emails" {
+  description = "Emails allowed through Cloudflare Access to wiki. (access.tf). Empty means no Access application. Needs account_id. Set in terraform.tfvars (gitignored)."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.wiki_access_emails) == 0 || var.account_id != null
+    error_message = "wiki_access_emails needs account_id."
   }
 }
 
