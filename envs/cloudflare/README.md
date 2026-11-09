@@ -15,6 +15,8 @@ The root module for the Cloudflare zone `sandeeppokharel.com.np`: all 14 DNS rec
 
 Plus the 2 Email Routing forward rules and the catch-all (off, drop), and, in tunnel mode, the tunnel and its routes ([`tunnel.tf`](tunnel.tf)).
 
+Plus the **WAF custom rules** ([`waf.tf`](waf.tf), added 2026-11-08): the zone's existing custom-rules entry point is adopted with an import block, then updated with one rule blocking hidden files (`/.env`, `/.git/…`, any path segment starting with a dot). Exceptions: the root `/.well-known` path and its descendants on every host, plus `/remote.php/` and `/public.php/` on the Nextcloud hosts (apex and `www`) only. nginx enforces the equivalent policy with 404 responses; Cloudflare's Block action returns 403. This resource owns the whole ruleset, so add custom rules here, not in the dashboard (Free: 5 rules, no regex). Token permission: Zone WAF Edit, already on the token as checked on 2026-11-08.
+
 Plus three more account alerts in the same file (Security Insights findings, Universal SSL certificate events, HTTP DDoS attacks mitigated; all free, no filters), and **Cloudflare Access on `wiki.`** ([`access.tf`](access.tf)): only the emails in `wiki_access_emails` get past Cloudflare's login, before anything reaches the tunnel. The login uses the Zero Trust organization's identity providers (Cloudflare or a one-time PIN). Token permission: **`Account` · `Access: Apps and Policies` · `Edit`**. Uptime Kuma's wiki check now sees Cloudflare's login page (it follows the redirect), so it shows Cloudflare is up, not that the wiki app is.
 
 Plus two protections ([`security.tf`](security.tf), added 2026-11-08): **leaked credential detection** on the zone, which the dashboard rate-limit rule "Leaked credential check" depends on (it was off, so that rule could never match), and the **tunnel health alert** below. Test the detection with Cloudflare's test password for Free plans, `CF_LEAKED_PASSWORD`, sent in a login form more than 5 times in 10 seconds: the rate-limit rule should block the 6th request.
@@ -51,6 +53,35 @@ Switching back to `"ip"` replaces them again and deletes the tunnel.
 **`enable_adblocker = false`** removes `dns.`. Do it **before** the Ad-Blocker's IP is released: a record left pointing at a released cloud IP can be taken over by whoever gets that IP next.
 
 **Server side:** behind the tunnel, nginx sees requests coming from Docker's port proxy (the compose network's gateway), so `server/sandeepcloud/nginx.conf` trusts Docker's range `172.16.0.0/12` for `CF-Connecting-IP`, and `restore.sh` installs that file over the backed-up one. Without that, logs and the login throttle would see one client. The range is trusted rather than one pinned subnet, because a pinned subnet could clash with the Hyper-V Default Switch, which picks a new 172.16-31 range at every reboot.
+
+## Hidden-file protection: adopt the custom ruleset (Sandeep)
+
+`waf.tf` imports the existing empty `http_request_firewall_custom` entry point and adds
+one enabled Block rule. Use the credentials and working-directory setup below, then
+run `terraform plan '-out=tfplan-dotfiles.tfplan'`. For an otherwise current deployment,
+expect **1 to import, 0 to add, 1 to change, 0 to destroy**: only
+`cloudflare_ruleset.custom_firewall` changes. Stop and review any DNS, mail, tunnel,
+Access or alert changes. After review, apply that saved plan and re-plan to confirm
+`No changes.` Do not create a second custom-rules entry point in the dashboard.
+
+The nginx half was deployed and verified on 2026-11-09: 80 isolated nginx routing
+cases and 28 live-origin dotfile checks passed. Root pages, Nextcloud status,
+CalDAV/CardDAV redirects and the unauthenticated DAV response were unchanged.
+The previous, credential-free config is kept on the VM as
+`~/sandeepcloud/nginx.conf.bak-2026-11-09-dotfiles`. To roll back, copy its contents over
+the existing `nginx.conf` file **without replacing the inode** (it is a Docker bind
+mount), run `nginx -t` in `sandeepcloud_nginx_1`, then reload with `nginx -s reload`.
+
+After the Cloudflare apply, public `/.env` and `/.git/config` probes should receive a
+Cloudflare 403; direct origin probes should still receive nginx 404. Check the root
+sites, Nextcloud discovery paths and DAV again. A 404 from the app alone does not prove
+that the new edge rule is enforcing the policy.
+
+**Applied and verified 2026-11-09:** Sandeep applied the reviewed plan (1 import,
+1 update), then the follow-up plan reported `No changes.` All 44 public checks passed:
+hidden-file probes received 403 on all five hostnames, root pages kept their expected
+responses, Nextcloud discovery redirects and DAV authentication still worked, and a
+Nextcloud `.obsidian` file-API path still reached authentication instead of the WAF.
 
 ## First run: import (Sandeep)
 
