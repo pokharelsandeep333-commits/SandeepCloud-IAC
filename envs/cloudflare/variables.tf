@@ -42,6 +42,17 @@ variable "account_id" {
   }
 }
 
+variable "alert_email" {
+  description = "Where the tunnel health alert (security.tf) is sent. Needed only when sandeepcloud_origin is tunnel. Set in terraform.tfvars (gitignored)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.sandeepcloud_origin != "tunnel" || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
+    error_message = "alert_email must be an email address when sandeepcloud_origin is tunnel."
+  }
+}
+
 variable "tunnel_name" {
   description = "Name of SandeepCloud's Cloudflare Tunnel, as shown in the dashboard."
   type        = string
