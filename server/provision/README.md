@@ -4,7 +4,7 @@ Builds a server from nothing on any cloud that ships an Ubuntu 24.04 or 26.04 im
 
 | Stage | Who runs it | Holds secrets? | Does |
 |---|---|---|---|
-| [`cloud-init.yaml.tftpl`](cloud-init.yaml.tftpl) → [`bootstrap.sh`](bootstrap.sh) | The cloud, on first boot | **No** | User `ubuntu` (uid 1000), packages, Docker, Tailscale, the Wazuh agent (4.14.9, held, off), restic and the backup units, `cloudflared` and its unit on SandeepCloud (off), and the host hardening from [`../sandeepcloud/host/`](../sandeepcloud/host/) or [`../adblocker/host/`](../adblocker/host/) |
+| [`cloud-init.yaml.tftpl`](cloud-init.yaml.tftpl) → [`bootstrap.sh`](bootstrap.sh) | The cloud, on first boot | **No** | User `ubuntu` (uid 1000), packages, Docker, Tailscale, the Wazuh agent (4.14.10, held, off), restic and the backup units, `cloudflared` and its unit on SandeepCloud (off), and the host hardening from [`../sandeepcloud/host/`](../sandeepcloud/host/) or [`../adblocker/host/`](../adblocker/host/) |
 | [`restore.sh`](restore.sh) | Sandeep, by hand, as root | Typed in at run time | Joins Tailscale, restores the backup, starts the apps, turns on the Wazuh agent and the backup timers |
 | [`tunnel-up.sh`](tunnel-up.sh) | Sandeep, by hand, as root, only on a host with no public IP | Typed in at run time | Stores the Cloudflare Tunnel token root-only and starts [`cloudflared-tunnel.service`](cloudflared-tunnel.service), which reads it as a systemd credential |
 
