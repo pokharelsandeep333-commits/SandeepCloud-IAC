@@ -24,15 +24,16 @@ This folder holds the code. The project's memory (decisions, inventory, logs and
 
 The vault has its own rules (`Obsidian Vault/LLM-Wiki/CLAUDE.md`). Only edit files in the `SandeepCloud IaC` folder there, and never put secrets or machine-local paths in vault notes.
 
-**The homelab laptop's notes, for context.** SandeepCloud's VM runs on the homelab laptop, which has its own vault folder: **`../Obsidian Vault/LLM-Wiki/Raw/Files/Homelab-Wazuh_tailscale/`**. Read a note there when a task touches the laptop. They're read-only from here (see the rule above).
+**The homelab laptop's notes, for context.** SandeepCloud's VM runs on the homelab laptop, which has its own vault folder: **`../Obsidian Vault/LLM-Wiki/Raw/Files/Homelab projects/`** (start at `00 Homelab - Project Hub`; reorganized 2026-11-08). Read a note there when a task touches the laptop. They're read-only from here (see the rule above).
 
 | Note | Read it for |
 |---|---|
-| **08 Homelab Laptop - Tailscale and SSH Setup** | The master doc for the laptop: WSL/Docker, the Wazuh manager, the watcher and Uptime Kuma (§10.6), CIS hardening, current state |
-| 07 Wazuh - Triage Playbook | Handling a Wazuh alert |
+| **Homelab Laptop/00 Homelab Laptop - Project Hub** and **05 … Task Board** | The laptop's current state and open tasks |
+| Homelab Laptop/03 Homelab Laptop - Build Log, Problems and Solutions | The old "doc 08" (same Part numbers): WSL/Docker, the Wazuh manager, the watcher and Uptime Kuma (§10.6), CIS hardening |
+| Wazuh/07 Wazuh - Triage Playbook | Handling a Wazuh alert |
 | 05 Wazuh - Build Log, Problems and Solutions / 06 Wazuh - What It Does | Wazuh history and custom rules / a plain-language overview |
 | 03 Wazuh - AWS CloudTrail Integration | How Wazuh reads this account's trail bucket (keep its name and policy working) |
-| 01 / 04 Tailscale | The tailnet design and the access policy (`tag:server`, ports 1514 and 8000) |
+| Tailscale/ 01 / 04 | The tailnet design and the access policy (`tag:server`, ports 1514 and 8000) |
 
 ## Hard dates
 
