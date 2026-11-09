@@ -11,8 +11,10 @@ sandeepcloud_ip = "<SANDEEPCLOUD_IP>"
 
 # Needed only when sandeepcloud_origin is "tunnel" (the tunnel belongs to the account)
 # account_id = "<ACCOUNT_ID>"
-# Where the tunnel health alert goes (security.tf); also needed only in tunnel mode
+# Where the account alerts go (security.tf); needed whenever account_id is set
 # alert_email = "<YOUR_MAILBOX>"
+# Who may open wiki. through Cloudflare Access (access.tf); empty = no Access app
+# wiki_access_emails = ["<YOUR_MAILBOX>"]
 
 # Set enable_adblocker = false before the Ad-Blocker's IP is released; that removes dns.
 enable_adblocker = true

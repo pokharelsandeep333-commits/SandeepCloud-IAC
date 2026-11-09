@@ -62,13 +62,25 @@ jobs:
         run: terraform fmt -check -recursive -diff
 
       # Each root module, without a backend: CI has no AWS or Cloudflare access and never reads state.
+      # The Cloudflare provider's files and signature are served from github.com, which returned
+      # 504s to the runners on 2026-11-09 (4 failed runs, PR #36); Terraform's registry client
+      # gives up after 2 attempts by default. More retries, a longer timeout, and up to 3 inits
+      # with a pause in between ride out a short outage. The lock file still pins the hashes.
       - name: ✅ terraform validate
         id: validate
         if: ${{ !cancelled() }}
+        env:
+          TF_REGISTRY_DISCOVERY_RETRY: "5"
+          TF_REGISTRY_CLIENT_TIMEOUT: "30"
         run: |
           for dir in bootstrap envs/prod envs/cloudflare; do
             echo "::group::$dir"
-            terraform -chdir="$dir" init -backend=false -input=false
+            for attempt in 1 2 3; do
+              terraform -chdir="$dir" init -backend=false -input=false && break
+              if [ "$attempt" -eq 3 ]; then exit 1; fi
+              echo "::warning::terraform init failed in $dir (attempt $attempt of 3), retrying in 30 s"
+              sleep 30
+            done
             terraform -chdir="$dir" validate
             echo "::endgroup::"
           done
