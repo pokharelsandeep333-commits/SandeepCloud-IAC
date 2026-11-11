@@ -40,8 +40,9 @@ param(
     [ValidateSet('sandeepcloud', 'adblocker')]
     [string]$Server = 'sandeepcloud',
 
+    # Fixed RAM. 4 GB since the laptop went to 20 GB (2026-11-10); the Ad-Blocker needs only -MemoryGB 1
     [ValidateRange(1, 8)]
-    [int]$MemoryGB = 2,
+    [int]$MemoryGB = 4,
 
     [ValidateRange(1, 4)]
     [int]$ProcessorCount = 2,

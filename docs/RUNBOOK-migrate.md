@@ -49,7 +49,7 @@ The full lists: [`server/backup/sandeepcloud.include`](../server/backup/sandeepc
   - `ignore_changes` on the user data, and the provider's version of `prevent_destroy` and termination protection.
   - A static public IP.
   - A firewall: **SandeepCloud** 80/443 from Cloudflare's ranges only. **Ad-Blocker** 80/443 from anywhere. **No port 22** (see step 3 for the first login).
-- [ ] 🏠 **homelab:** the laptop is ready ([prerequisites](../server/homelab/hyperv/README.md#prerequisites-done-2026-10-27-unless-noted): Hyper-V on, WSL capped so the VM's 2 GB fits, `qemu-img` in WSL). For the tunnel, the Cloudflare token has **Cloudflare One Connector: cloudflared · Edit** (Account API Tokens), and `account_id` is in `envs/cloudflare/terraform.tfvars` ([its README](../envs/cloudflare/README.md#sandeepcloud-through-a-cloudflare-tunnel-sandeepcloud_origin)). SandeepCloud only: the Ad-Blocker's `dns.` stays DNS-only with its own certificate (step 7), so this path doesn't cover it.
+- [ ] 🏠 **homelab:** the laptop is ready ([prerequisites](../server/homelab/hyperv/README.md#prerequisites-done-2026-10-27-unless-noted): Hyper-V on, WSL capped so the VM's 4 GB fits, `qemu-img` in WSL). For the tunnel, the Cloudflare token has **Cloudflare One Connector: cloudflared · Edit** (Account API Tokens), and `account_id` is in `envs/cloudflare/terraform.tfvars` ([its README](../envs/cloudflare/README.md#sandeepcloud-through-a-cloudflare-tunnel-sandeepcloud_origin)). SandeepCloud only: the Ad-Blocker's `dns.` stays DNS-only with its own certificate (step 7), so this path doesn't cover it.
 - [ ] At least the live sizes:
 
   | Server | Live (AWS) | Minimum on the new cloud |
