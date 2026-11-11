@@ -162,6 +162,14 @@ EOF
     docker exec sandeepcloud_db_1 healthcheck.sh --connect --innodb_initialized ||
       die "MariaDB's healthcheck still fails after the import"
     docker compose up -d
+    # The restored config.php names the old server's proxy network. Point it at Docker's pool
+    # (daemon.json). Apache's remoteip in the image already trusts 10.0.0.0/8, so this is tidy-up
+    for _ in $(seq 60); do
+      docker exec -u www-data sandeepcloud_nextcloud_1 php occ status >/dev/null 2>&1 && break
+      sleep 5
+    done
+    docker exec -u www-data sandeepcloud_nextcloud_1 php occ config:system:set trusted_proxies 0 \
+      --value=10.204.0.0/16
 
     step "Uptime Kuma"
     docker compose -f /home/ubuntu/uptime-kuma/docker-compose.yml up -d

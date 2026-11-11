@@ -12,7 +12,7 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | File | On the server at | How it got here |
 |---|---|---|
 | `sandeepcloud/docker-compose.yml` | `/home/ubuntu/sandeepcloud/` | Copied as-is |
-| `sandeepcloud/nginx.conf` | `/home/ubuntu/sandeepcloud/` (mounted into the nginx container) | Copied as-is, plus the Cloudflare Tunnel's trusted proxy range (`172.16.0.0/12`, added 2026-10-27, not on AWS). `provision/restore.sh` installs this copy over the one in the backup |
+| `sandeepcloud/nginx.conf` | `/home/ubuntu/sandeepcloud/` (mounted into the nginx container) | Copied as-is, plus the Cloudflare Tunnel's trusted proxy range (Docker's address pool `10.204.0.0/16` from `host/etc/docker/daemon.json`; added 2026-10-27 as `172.16.0.0/12`, moved 2026-11-10; not on AWS). `provision/restore.sh` installs this copy over the one in the backup |
 | `sandeepcloud/uptime-kuma/docker-compose.yml` | `/home/ubuntu/uptime-kuma/` | Copied as-is |
 | `sandeepcloud/logrotate-sandeepcloud-nginx` | `/etc/logrotate.d/sandeepcloud-nginx` | Copied as-is |
 | `sandeepcloud/nextcloud-db-dump.sh` | `/usr/local/sbin/` | Copied as-is: nightly MariaDB dump, 7 days kept |
