@@ -9,7 +9,7 @@ SandeepCloud's **temporary home** on the homelab laptop, between AWS and the nex
 | Image | Ubuntu 24.04 cloud image, pinned to `release-20261017`; SHA-256 checked on every run (the release's `SHA256SUMS` verified against Canonical's signing key on 2026-10-27) |
 | OS disk | `qemu-img` (in WSL) converts it to a dynamic VHDX, grown to 60 GB. cloud-init grows the root partition on first boot |
 | Seed | `cloud-init.yaml.tftpl` downloaded at `-RepoRef` and filled in like Terraform's `templatefile()`, on a small FAT disk labelled `CIDATA` (cloud-init's NoCloud source) |
-| VM | Generation 2, Secure Boot (Microsoft UEFI CA), 2 vCPU, **2 GB fixed**, no checkpoints, on the **Default Switch**, and starts with the laptop |
+| VM | Generation 2, Secure Boot (Microsoft UEFI CA), 2 vCPU, **4 GB fixed** (2 GB until 2026-11-10), no checkpoints, on the **Default Switch**, and starts with the laptop |
 
 **The Default Switch is NAT:** the VM can reach out, and nothing on the internet or the home Wi-Fi can reach in. The tunnel is outbound, and so is Tailscale, so the VM needs no open ports. Before Tailscale is up, the only way in is from the laptop itself, hence the `ssh -J homelab` jump below.
 
@@ -17,7 +17,7 @@ Files live in `C:\homelab\vms\` (outside OneDrive): the cached image in `images\
 
 ## Prerequisites (done 2026-10-27 unless noted)
 
-- Hyper-V enabled, WSL capped at 6 GB (`.wslconfig`), so Wazuh and the VM both fit in the laptop's 12 GB.
+- Hyper-V enabled, WSL capped at 8 GB (`.wslconfig`), so Wazuh and the VM's 4 GB both fit in the laptop's 20 GB with room for Windows (6 GB and 2 GB on 12 GB until the RAM upgrade, 2026-11-10).
 - `qemu-img` in the WSL distro, once (asks for your WSL password):
   ```powershell
   wsl -d Ubuntu-24.04 -- sudo apt-get install -y qemu-utils
