@@ -219,6 +219,7 @@ If it stops, fix the cause and look at what it already did before running it aga
 cd /home/ubuntu/sandeepcloud && sudo docker compose down -v
 sudo docker compose -f /home/ubuntu/uptime-kuma/docker-compose.yml down -v
 sudo tailscale serve --tcp=3001 off
+sudo tailscale serve --https=3443 off
 sudo /home/ubuntu/SandeepCloud-IAC/server/provision/restore.sh sandeepcloud
 ```
 
