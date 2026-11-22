@@ -1,5 +1,7 @@
 # Uptime Kuma: site monitoring + dead-man's switch for the homelab laptop (2026-10-14).
-# Reachable ONLY via Tailscale Serve (tailscale serve --bg --tcp=3001 tcp://localhost:3001); never published publicly.
+# Reachable ONLY via Tailscale Serve, never published publicly: https://<host>.<tailnet>.ts.net:3443
+# (tailscale serve --bg --https=3443 http://localhost:3001) for people, plus the raw TCP forward
+# (tailscale serve --bg --tcp=3001 tcp://localhost:3001) that the homelab watcher pushes to.
 services:
   uptime-kuma:
     # -slim (2026-11-08): no bundled Chromium or embedded MariaDB. Trivy found 844 fixable

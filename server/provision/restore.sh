@@ -174,6 +174,8 @@ EOF
     step "Uptime Kuma"
     docker compose -f /home/ubuntu/uptime-kuma/docker-compose.yml up -d
     tailscale serve --bg --tcp=3001 tcp://localhost:3001
+    # HTTPS with the tailnet's *.ts.net certificate (2026-11-22). 3001 stays for the homelab watcher's push URL.
+    tailscale serve --bg --https=3443 http://localhost:3001
     ;;
 
   adblocker)
