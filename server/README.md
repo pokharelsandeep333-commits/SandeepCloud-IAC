@@ -18,6 +18,8 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | `sandeepcloud/nextcloud-db-dump.sh` | `/usr/local/sbin/` | Copied as-is: nightly MariaDB dump, 7 days kept |
 | `sandeepcloud/cron.d-nextcloud-db-dump` | `/etc/cron.d/nextcloud-db-dump` | Copied as-is: runs the dump at 05:30 UTC |
 | `sandeepcloud/crontab-ubuntu` | `ubuntu`'s crontab | Copied as-is: Nextcloud `cron.php` every 5 minutes, wiki `git pull` every minute |
+| `sandeepcloud/sync-vault.sh` | `/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/` | Rewritten 2026-11-27: pulls the wiki clone `arc-vault` serves (fast-forward only, one run at a time, timestamped errors) and pushes to an Uptime Kuma push monitor. `provision/restore.sh` installs this copy over the one in the backup. GitHub access is a read-only LLM-Wiki deploy key, `~/.ssh/llm-wiki-deploy`, selected by `~/.ssh/config` |
+| `sandeepcloud/sync-vault.env.example` | `sync-vault.env` next to the script (ubuntu, 0600) | Template: `PUSH_URL`, the Kuma push monitor "Wiki sync" (`http://127.0.0.1:3001/api/push/<token>`) |
 | `backup/` | `/etc/restic`, `/usr/local/sbin`, systemd | Written new: restic backups to R2 and the homelab. See [`backup/README.md`](backup/README.md) |
 | `provision/` | first boot (cloud-init) and `restore.sh` | Written new: rebuilds either server on any cloud, then restores it. See [`provision/README.md`](provision/README.md) |
 | `sandeepcloud/host/etc/...` | the same path under `/etc` | Copied as-is (2026-10-26): the CIS and audit hardening, applied by `provision/bootstrap.sh` |
@@ -39,7 +41,7 @@ What runs **inside** the two servers. Terraform builds the instances; these file
 | SandeepCloud | Ad-Blocker |
 |---|---|
 | `/home/ubuntu/sandeepcloud/.env` (DB passwords) | `/opt/adguardhome/conf/AdGuardHome.yaml` (admin password hash, filters) |
-| `/home/ubuntu/portfolio/.env` | `/opt/adguardhome/work/` (query log, stats) |
+| `/home/ubuntu/portfolio/.env`, `.env.chat` (the chat API's keys) | `/opt/adguardhome/work/` (query log, stats) |
 | `/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/.env` | `/etc/nginx/adguard-admin-allow.conf` (home IP) |
 | `/home/ubuntu/ShiftSentry/.env.production` | `/etc/letsencrypt/` (cert for `dns.`; can be reissued) |
 | `/home/ubuntu/sandeepcloud/watchtower/config/` (registry login) | |

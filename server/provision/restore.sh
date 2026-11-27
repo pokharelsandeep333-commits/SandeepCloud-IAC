@@ -117,7 +117,10 @@ case "$host" in
     # tunnel's trusted proxy range, so it goes in before nginx starts
     install -m 0644 -o root -g root "$repo/server/sandeepcloud/nginx.conf" /home/ubuntu/sandeepcloud/nginx.conf
 
-    step "Wiki clone (deploy key restored in ~/.ssh)"
+    step "Wiki clone (deploy key ~/.ssh/llm-wiki-deploy and ~/.ssh/config restored)"
+    # The repo's sync script replaces the backup's copy (same as nginx.conf above)
+    install -m 0775 -o ubuntu -g ubuntu "$repo/server/sandeepcloud/sync-vault.sh" \
+      /home/ubuntu/Molecular-Zettelkasten/ec2-deployment/sync-vault.sh
     wiki=/home/ubuntu/Molecular-Zettelkasten/ec2-deployment/LLM-Wiki
     # Before the containers start: Docker would create the bind-mount path as root
     if [ ! -d "$wiki/.git" ]; then
