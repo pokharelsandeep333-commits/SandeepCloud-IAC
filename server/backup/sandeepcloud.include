@@ -6,6 +6,7 @@
 
 # App env files (secrets)
 /home/ubuntu/portfolio/.env
+/home/ubuntu/portfolio/.env.chat
 /home/ubuntu/ShiftSentry/.env.production
 /home/ubuntu/Molecular-Zettelkasten/ec2-deployment
 
